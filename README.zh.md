@@ -62,6 +62,7 @@
 ## 亮点
 
 - **一个胶囊，五家服务商。** DeepSeek、OpenRouter、Moonshot/Kimi、Zhipu/GLM（Z.ai）与 MiniMax——各自带有品牌图标、货币单位与悬停明细。
+- **首页也显示。** 空会话时胶囊位于输入框工具行（模型选择器旁）；发送第一条消息时它会动画飞入下方状态条。
 - **感知服务商。** 切换活跃模型，胶囊立即切换到对应服务商的余额。
 - **在 DeepSeek 上感知高峰/空闲。** 状态圆点在 DeepSeek 高峰计费时段（周一至周五，北京时间 09:00–12:00 与 14:00–18:00）变红，空闲时段变绿（此时请求按半价计费）。
 - **密钥永不进入浏览器。** 由宿主端解析凭证并请求服务商，浏览器只会看到归一化后的余额数据。
@@ -109,7 +110,7 @@
 - **点击** —— 立即刷新。
 - **错误** —— 灰色 `Balance —` 胶囊；悬停查看原因，点击重试。
 - **紧凑设计** —— 胶囊与活动、用量、上下文指示器处于同一行高，只占用自身内容所需的宽度，且从不隐藏金额。
-- 状态条只在会话的输入框视图中渲染——首页不会显示胶囊。
+- 状态条只在会话的输入框视图中渲染；首页上胶囊位于输入框工具行，首次发送时会动画飞入状态条。
 
 ### DeepSeek 高峰 / 空闲时段
 
@@ -241,7 +242,7 @@ DSH_BALANCE_MOCK=1 dsh web
 |---|---|---|
 | Bundle 层 | `cordis.patch.yml` | 由 `dsh.bundle` 声明；当 profile 列出本包时插入 `dsh-balance` 行，因此 `dsh plugin add` 无需手动修改补丁文件。 |
 | 宿主端（Node） | `src/index.ts` | 在宿主 Web 服务器上注册 `GET /plugins/balance?kind=…`。通过凭证接缝（以及新增服务商的启动环境）解析密钥，请求服务商，并转发归一化后的余额。**密钥不会经过网络传到浏览器。** |
-| 浏览器端 | `src/client/index.tsx` | 将 `BalanceChip` 组件注册到 `conversation.composer.dock` 插槽，并固定在状态条最右端。从模型目录存储（`ctx.modelDirectories`）读取当前会话的模型服务商，映射为 `kind`，并每 60 秒、点击时、会话切换时、模型切换时轮询宿主路由。每种服务的返回数据由各自的渲染器整形。 |
+| 浏览器端 | `src/client/index.tsx` | 将 `BalanceChip` 组件注册到 `conversation.composer.dock` 插槽（固定在状态条最右端）与 `conversation.input.right` 插槽（会话为空时的输入框工具行）。两个位置通过记忆位置交接，首次发送时胶囊会从工具行飞入状态条。从模型目录存储（`ctx.modelDirectories`）读取当前会话的模型服务商，映射为 `kind`，并每 60 秒、点击时、会话切换时、模型切换时轮询宿主路由。每种服务的返回数据由各自的渲染器整形。 |
 
 浏览器端产物由宿主的 client-module 流水线以 Web 外壳所需的 `window.__ModuleLoader__.load({ id, factory })` 闭包格式提供；`react` 与 `@deepseek-ai/*` 平台模块保持外部依赖，从浏览器冻结的模块表中解析。
 
@@ -266,7 +267,7 @@ pnpm run verify    # 在桩模块表上执行客户端产物并校验契约
 | 显示 `Balance —` 且提示 `Set DEEPSEEK_API_KEY …` | 凭证无法解析。请写入 `~/.dsh/.credentials.yaml` 或启动环境。 |
 | 其他服务商却显示 DeepSeek 余额 | 该路由 id 不在上面的映射表中——请带上路由 id 提交 issue。 |
 | 重命名包之后胶囊消失 | client-module 的 id 就是包名；请确认 `cordis.patch.yml` 中的行与 `dsh.profile.bundles` 中的条目都与 `package.json` 一致，然后重启 `dsh web`。 |
-| 首页看不到胶囊 | 正常现象——状态条只在会话的输入框视图中渲染。 |
+| 首页看不到胶囊 | 首页上胶囊位于输入框工具行（模型选择器旁），而不是下方状态条；发送第一条消息后它会飞入状态条。 |
 | Moonshot 或 Zhipu 返回上游 `401`/`403` | 密钥属于另一个区域主机；插件已尝试镜像站点，若仍报错说明该密钥在两个站点都无效。 |
 
 ## 常见问答

@@ -1,13 +1,15 @@
 /**
  * dsh-balance, browser half.
  *
- * Renders a balance chip into the composer dock — the
- * `conversation.composer.dock` slot, the "ambient entries below the composer
- * card" extension point: the status strip under the search bar that carries
- * the activity, usage and context pills. The chip is pinned to the right end
- * of that strip, after the context meter. It polls the host route served by
- * the node half (`GET /plugins/balance`), so the API key never reaches the
- * browser.
+ * Renders a balance chip in two seats of the composer. In a running session it
+ * sits in the composer dock — the `conversation.composer.dock` slot, the
+ * "ambient entries below the composer card" extension point: the status strip
+ * under the search bar that carries the activity, usage and context pills —
+ * pinned to the right end of that strip, after the context meter. While the
+ * session is still blank (the hero screen) it sits in the composer tool row
+ * beside the model selector (`conversation.input.right`), and the first send
+ * flies it down to the dock. It polls the host route served by the node half
+ * (`GET /plugins/balance`), so the API key never reaches the browser.
  *
  * The chip is provider-aware: it reads the *active session's* selected model
  * from the model-directory store (`ctx.modelDirectories`) and asks the host for
@@ -24,8 +26,9 @@
  * with the reason in a tooltip. Refreshes every minute, on click, whenever the
  * active session changes, AND as soon as the active session's model is switched
  * (via its model-directory store) — so flipping a model in the dropdown flips
- * the chip to that provider's balance immediately. The dock renders only in a
- * session's composer view, so the hero screen shows no chip.
+ * the chip to that provider's balance immediately. The two seats hand over via
+ * a remembered position (FLIP): each instance flies in from where the previous
+ * one sat, so the swap on the first send reads as one continuous pill.
  *
  * The status dot has provider meaning: DeepSeek marks its peak/off-peak
  * billing window (green = off-peak, red = peak; peak hours are 01:00–04:00 and
@@ -168,7 +171,7 @@ function kindForProvider(provider: string): BalanceKind {
  */
 interface SessionsSnapshotLike {
   current?: SessionId | null
-  byId?: Record<string, { id?: SessionId; retainedBy?: { mainView?: number } }>
+  byId?: Record<string, { id?: SessionId; retainedBy?: { mainView?: number }; blank?: boolean }>
 }
 
 /**
@@ -184,6 +187,23 @@ interface SessionsSnapshotLike {
 function currentSessionId(snapshot: SessionsSnapshotLike): SessionId | undefined {
   if (snapshot.current !== undefined && snapshot.current !== null) return snapshot.current
   return Object.values(snapshot.byId ?? {}).find(row => (row.retainedBy?.mainView ?? 0) > 0)?.id
+}
+
+/**
+ * Whether the open session is still blank — no message sent yet, which is
+ * exactly the window the Hero composer is on screen. The shell derives its own
+ * hero state from this same flag, so the chip's hero seat appears and
+ * disappears with the hero itself.
+ * @param snapshot - the sessions list snapshot supplied by `useSessions`.
+ * @returns true while the open session has no messages.
+ */
+function sessionIsBlank(snapshot: SessionsSnapshotLike): boolean {
+  const id = currentSessionId(snapshot)
+  if (id === undefined) return false
+  // The live store keys `byId` by session id; tolerate a row that carries its
+  // own id under a different key, the same way `currentSessionId` scans values.
+  const row = snapshot.byId?.[id] ?? Object.values(snapshot.byId ?? {}).find((candidate) => candidate.id === id)
+  return row?.blank === true
 }
 
 /**
@@ -563,24 +583,86 @@ export function applyDockOrder(anchor: HTMLElement): DockPin[] {
   })
 }
 
+/** Where the chip was last painted, so a remount in the other seat can fly from there. */
+interface ChipAnchor { readonly x: number; readonly y: number; readonly at: number }
+
 /**
- * The balance chip component. Rendered by the slot runtime into the composer
- * dock with the standard session props; `getModelDirectories` is the lazy
- * accessor the wrapper closes over, so the chip still resolves the service when
- * the model-selection plugin activates after this one.
- * @param props - composed slot props plus the injected model-directory accessor.
- * @returns the chip element, pinned to the dock's right end.
+ * How stale a remembered position may be and still start a flight. A visible
+ * hero chip repaints on every refresh tick, so this window — one tick plus a
+ * margin — keeps its position flight-eligible for the whole time it is on
+ * screen, while a position left behind long ago (a session opened directly
+ * into the transcript, a page load) simply paints in place.
+ */
+const FLIP_WINDOW_MS = REFRESH_INTERVAL_MS + 15_000
+
+/** The flight's duration and curve: short and decelerating, like the dock's own motion. */
+const FLIP_TRANSITION = 'transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1)'
+
+let lastChipAnchor: ChipAnchor | undefined
+
+/**
+ * Record where the chip is painted, so the instance that takes over in the
+ * other seat (hero tool row ⇄ composer dock) starts its flight from here. The
+ * two seats are different DOM subtrees, so without this handoff the swap on
+ * the first send would read as the pill teleporting.
+ * @param element - the chip's own element.
+ */
+export function rememberChipAnchor(element: HTMLElement): void {
+  const rect = element.getBoundingClientRect()
+  lastChipAnchor = { x: rect.left, y: rect.top, at: Date.now() }
+}
+
+/**
+ * Fly the chip in from where its previous instance sat (FLIP): translate it to
+ * the old position with no transition, flush that offset so it is the
+ * transition's start, then release it to its own spot. A fresh mount with no
+ * recent sibling, a reduced-motion setting, or a distance under two pixels
+ * paints in place instead.
+ * @param element - the chip's own element, already laid out in its new seat.
+ */
+export function flyChipIn(element: HTMLElement): void {
+  const from = lastChipAnchor
+  if (from === undefined || Date.now() - from.at > FLIP_WINDOW_MS) return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const here = element.getBoundingClientRect()
+  const dx = from.x - here.left
+  const dy = from.y - here.top
+  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return
+  element.style.transition = 'none'
+  element.style.transform = `translate(${dx}px, ${dy}px)`
+  // Reading a layout property flushes the offset written above, so the
+  // transition starts from it instead of collapsing both writes into one frame.
+  void element.offsetWidth
+  element.style.transition = FLIP_TRANSITION
+  element.style.transform = ''
+  window.setTimeout(() => { element.style.transition = '' }, 320)
+}
+
+/**
+ * The balance chip component. Rendered by the slot runtime into either seat —
+ * the composer dock (`variant: 'dock'`) or the hero tool row beside the model
+ * selector (`variant: 'hero'`) — with the standard session props, which are
+ * identical for both slots. `getModelDirectories` is the lazy accessor the
+ * wrapper closes over, so the chip still resolves the service when the
+ * model-selection plugin activates after this one.
+ * @param props - composed slot props plus the seat variant and injected accessor.
+ * @returns the chip element, or null when the hero seat has no blank session.
  */
 export function BalanceChip({
+  variant,
   getModelDirectories,
   useSessions,
 }: PropsRuntime<'conversation.composer.dock'> & {
+  variant: 'hero' | 'dock'
   getModelDirectories: () => ModelDirectoryServiceLike | undefined
 }) {
   const [state, setState] = useState<DisplayState>({ kind: 'loading' })
   const anchorRef = useRef<HTMLDivElement>(null)
   const activeSession = useSessions(
     (snapshot) => currentSessionId(snapshot as unknown as SessionsSnapshotLike),
+  )
+  const blank = useSessions(
+    (snapshot) => sessionIsBlank(snapshot as unknown as SessionsSnapshotLike),
   )
 
   const refresh = useCallback(async () => {
@@ -595,17 +677,23 @@ export function BalanceChip({
     }
   }, [getModelDirectories, activeSession])
 
+  // Poll while visible. The hero instance stays mounted (rendering nothing)
+  // once the session gets its first message, and an idle instance has no
+  // reason to keep spending requests — the dock instance takes the polling
+  // over in the same commit.
   useEffect(() => {
+    if (variant === 'hero' && !blank) return
     void refresh()
     const timer = window.setInterval(() => { void refresh() }, REFRESH_INTERVAL_MS)
     return () => { window.clearInterval(timer) }
-  }, [refresh])
+  }, [refresh, variant, blank])
 
   // Subscribe to the active session's model-directory store so the chip
   // re-polls as soon as the directory resolves and whenever flipping the model
   // in the dropdown changes the current provider, without waiting for the next
   // 60s tick.
   useEffect(() => {
+    if (variant === 'hero' && !blank) return
     const modelDirectories = getModelDirectories()
     if (modelDirectories === undefined || activeSession === undefined) return
     let directory: { store: ModelDirectoryStoreLike }
@@ -624,20 +712,47 @@ export function BalanceChip({
     }
     const unsubscribe = directory.store.subscribe(onModelChange)
     return () => { unsubscribe() }
-  }, [getModelDirectories, activeSession, refresh])
+  }, [getModelDirectories, activeSession, refresh, variant, blank])
 
   // Pin the chip to the dock's right end, after the context meter. The pin
   // writes `order` on the slot outlet (the dock row's real flex child) and on
   // the anchor, and restores both on unmount so an uninstall leaves the dock
-  // exactly as it found it.
+  // exactly as it found it. The hero seat needs no pin — it joins the tool
+  // row's own chips in slot order.
   useLayoutEffect(() => {
+    if (variant !== 'dock') return
     const anchor = anchorRef.current
     if (anchor === null) return
     const pins = applyDockOrder(anchor)
     return () => {
       for (const { element, previous } of pins) element.style.order = previous
     }
+  }, [variant])
+
+  // Hand the chip's position between the two seats: fly in from where the
+  // previous instance sat, and leave this position behind for the next one.
+  // The hero tool row and the composer dock are different DOM subtrees, so the
+  // swap on the first send reads as one continuous pill travelling down.
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current
+    if (anchor === null) return
+    flyChipIn(anchor)
+    return () => { rememberChipAnchor(anchor) }
   }, [])
+
+  // Keep the remembered position current on every hero paint: the send flips
+  // independent stores, and if the seats ever swap in separate commits the
+  // dock instance still has the hero's last position to fly from.
+  useLayoutEffect(() => {
+    if (variant !== 'hero') return
+    const anchor = anchorRef.current
+    if (anchor !== null) rememberChipAnchor(anchor)
+  })
+
+  // The hero seat belongs to the blank session: the moment the first prompt
+  // is sent the shell swaps to the composer view, the dock instance takes
+  // over, and this one's remembered position becomes its flight's origin.
+  if (variant === 'hero' && !blank) return null
 
   return (
     <div ref={anchorRef}>
@@ -686,7 +801,17 @@ export function apply(ctx: ClientContext): void {
       id: 'balance',
       order: 100,
     }, (props) => (
-      <BalanceChip {...props} getModelDirectories={getModelDirectories} />
+      <BalanceChip variant="dock" {...props} getModelDirectories={getModelDirectories} />
+    )))
+    // The hero tool row beside the model selector: the same chip for a blank
+    // session, so a new session shows its balance before the first send — and
+    // the pill flies down to the dock when that send swaps the seats.
+    scope.slots.inject('conversation.input.right', () => scope.slots.register({
+      name: 'conversation.input.right',
+      id: 'balance',
+      order: 100,
+    }, (props) => (
+      <BalanceChip variant="hero" {...props} getModelDirectories={getModelDirectories} />
     )))
   })
 }

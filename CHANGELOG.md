@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.6.0] — 2026-10-26
+
+### Added
+
+- The chip now also appears on the **hero screen**: a second registration on
+  the `conversation.input.right` slot puts it in the composer tool row beside
+  the model selector while the session is still blank, so a new session shows
+  its balance before the first prompt is sent.
+- The seat swap **animates**: each chip instance remembers its painted position
+  and the next instance flies in from there (FLIP), so sending the first prompt
+  travels the pill from the tool row down to the dock strip instead of
+  teleporting. `prefers-reduced-motion` paints in place, and so do stale
+  anchors (older than one refresh tick plus a margin) and sub-2px hops.
+
+### Changed
+
+- The hero instance stops polling once the session gets its first message —
+  the dock instance takes the polling over in the same commit, so the swap
+  never doubles the requests.
+
 ## [0.5.0] — 2026-10-26
 
 ### Changed

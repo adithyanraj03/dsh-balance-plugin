@@ -1,7 +1,7 @@
 // Simulate the DSH browser module table to verify lib/client.js evaluates,
 // registers with __ModuleLoader__, exports the plugin contract, applies into
-// the conversation.composer.dock slot, and the registered entry is the balance
-// chip.
+// both composer seats (conversation.composer.dock and conversation.input.right),
+// and the registered entries are the balance chip.
 import { readFileSync } from 'node:fs'
 
 /** The client-module entry id: the DSH node half derives it from the package name. */
@@ -77,12 +77,12 @@ console.log(`peak-hour assertions: PASS (${peakCases.length} cases, incl. weeken
 // Apply with a fake slot registry and a fake plugin scope exposing the optional
 // model-directory service lazily (the real service registers after this plugin).
 const injected = []
-let injectedCb = null
-let registered = null
+const injectedCbs = []
+const registrations = []
 let fakeModelDirectories
 const slots = {
-  inject: (key, cb) => { injected.push(key); injectedCb = cb },
-  register: (opts, component) => { registered = { opts, component }; return () => {} },
+  inject: (key, cb) => { injected.push(key); injectedCbs.push(cb) },
+  register: (opts, component) => { registrations.push({ opts, component }); return () => {} },
 }
 const ctx = {
   inject: (services, cb) => {
@@ -99,18 +99,22 @@ const ctx = {
 }
 mod.apply(ctx)
 console.log('slots.inject called with:', injected)
-if (injected.length !== 1 || injected[0] !== 'conversation.composer.dock') throw new Error('slot injection mismatch')
+if (injected.length !== 2 || injected[0] !== 'conversation.composer.dock' || injected[1] !== 'conversation.input.right') throw new Error('slot injection mismatch')
 
-const disposer = injectedCb()
-console.log('register opts:', JSON.stringify(registered.opts))
-if (registered.opts.name !== 'conversation.composer.dock' || registered.opts.id !== 'balance') throw new Error('register opts mismatch')
-if (registered.opts.order !== 100) throw new Error(`register order mismatch: ${registered.opts.order}`)
-if (typeof disposer !== 'function') throw new Error('register must return a disposer')
+const disposers = injectedCbs.map((cb) => cb())
+console.log('register opts:', JSON.stringify(registrations.map((reg) => reg.opts)))
+const dockReg = registrations.find((reg) => reg.opts.name === 'conversation.composer.dock')
+const heroReg = registrations.find((reg) => reg.opts.name === 'conversation.input.right')
+if (dockReg === undefined || heroReg === undefined) throw new Error('both seats must register')
+for (const reg of registrations) {
+  if (reg.opts.id !== 'balance' || reg.opts.order !== 100) throw new Error(`register opts mismatch: ${JSON.stringify(reg.opts)}`)
+}
+if (!disposers.every((disposer) => typeof disposer === 'function')) throw new Error('register must return a disposer')
 
 // The registered entry is the chip wrapper: invoking it with the standard
 // `useSessions` seat returns an element (a jsx descriptor whose `type` is the
 // BalanceChip component).
-const el = registered.component({ useSessions: () => undefined })
+const el = dockReg.component({ useSessions: () => undefined })
 console.log('registered entry render type:', typeof el.type)
 if (typeof el.type !== 'function') throw new Error('the registered entry should render a component')
 
@@ -123,7 +127,7 @@ globalThis.fetch = async (url) => {
   fetched.push(String(url))
   return { json: async () => ({ ok: false, error: 'test', message: 'test' }) }
 }
-async function requestedKind({ provider, absent = false, throws = false, noSession = false, snapshot }) {
+async function requestedKind({ provider, absent = false, throws = false, noSession = false, snapshot, variant = 'dock' }) {
   effects.length = 0
   fetched.length = 0
   fakeModelDirectories = absent ? undefined : {
@@ -138,6 +142,7 @@ async function requestedKind({ provider, absent = false, throws = false, noSessi
     },
   }
   mod.BalanceChip({
+    variant,
     // `snapshot` drives the chip's OWN session selector over a real snapshot
     // shape; otherwise the seat is stubbed with a fixed session id.
     useSessions: snapshot === undefined
@@ -172,6 +177,11 @@ const kindCases = [
   [{ provider: 'openrouter', snapshot: { byId: { s: { id: 'session-1', retainedBy: { mainView: 2 } } } } }, 'openrouter', 'main-view retention is a count, not a boolean'],
   [{ provider: 'openrouter', snapshot: { byId: { s: { id: 'session-1', retainedBy: {} } } } }, 'deepseek', 'a snapshot with no main-view retention falls back to DeepSeek'],
   [{ provider: 'openrouter', snapshot: {} }, 'deepseek', 'an empty snapshot falls back to DeepSeek'],
+  // The hero seat belongs to the blank session only: it polls while the
+  // session has no messages and goes silent the moment the first send lands,
+  // leaving the dock instance to take over.
+  [{ provider: 'openrouter', variant: 'hero', snapshot: { byId: { s: { id: 'session-1', retainedBy: { mainView: 1 }, blank: true } } } }, 'openrouter', 'hero seat polls for a blank session'],
+  [{ provider: 'openrouter', variant: 'hero', snapshot: { byId: { s: { id: 'session-1', retainedBy: { mainView: 1 }, blank: false } } } }, undefined, 'hero seat goes silent once the session has messages'],
 ]
 for (const [input, expected, label] of kindCases) {
   const actual = await requestedKind(input)

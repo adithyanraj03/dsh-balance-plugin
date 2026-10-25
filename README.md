@@ -62,6 +62,7 @@ On DeepSeek the chip also tracks **peak / off-peak billing** — the status dot 
 ## Highlights
 
 - **One chip, five providers.** DeepSeek, OpenRouter, Moonshot/Kimi, Zhipu/GLM (Z.ai), and MiniMax — each with its own brand mark, currency, and tooltip breakdown.
+- **On the hero too.** A blank session shows the chip in the composer tool row beside the model selector; the first send flies it down to the dock strip.
 - **Provider-aware.** Switching the active model switches the chip to that provider's balance immediately.
 - **Peak/off-peak aware on DeepSeek.** The status dot turns red during DeepSeek's peak billing window (Monday–Friday, Beijing 09:00–12:00 and 14:00–18:00) and green off-peak, when requests cost half price.
 - **Your key never reaches the browser.** The host half resolves the credential and calls the provider; the browser only ever sees a normalized balance.
@@ -112,7 +113,7 @@ The mapping is deliberately narrow: a route the plugin does not recognize (inclu
 - **Click** — refresh now.
 - **Errors** — a muted `Balance —` pill; hover for the reason, click to retry.
 - **Compact by design** — the chip is a slim pill on the same text line as the activity, usage and context pills, and it takes exactly the width its own content needs. The chip never gives up its amount.
-- The dock renders only in a session's composer view — the hero screen shows no chip.
+- The dock strip renders only in a session's composer view; on the hero screen the chip sits in the composer tool row instead, and the first send animates it down.
 
 ### DeepSeek peak / off-peak hours
 
@@ -244,7 +245,7 @@ Then add a route in **Settings → Models** for the provider you want to preview
 |---|---|---|
 | Bundle layer | `cordis.patch.yml` | Declared by `dsh.bundle`; inserts the `dsh-balance` row when a profile lists the package, so `dsh plugin add` needs no manual patch editing. |
 | Host (Node) | `src/index.ts` | Registers `GET /plugins/balance?kind=…` on the host web server. Resolves the key through the credentials seam (and the launch environment for the added providers), calls the provider, and relays a normalized balance. **The key never crosses the wire to the browser.** |
-| Browser | `src/client/index.tsx` | Registers the `BalanceChip` component into the `conversation.composer.dock` slot, pinned to the strip's right end. Reads the active session's model provider from the model-directory store (`ctx.modelDirectories`), maps it to a `kind`, and polls the host route every 60s, on click, on session change, and on model switch. Each provider's payload is shaped by its own renderer. |
+| Browser | `src/client/index.tsx` | Registers the `BalanceChip` component into the `conversation.composer.dock` slot (pinned to the strip's right end) and the `conversation.input.right` slot (the hero tool row, while the session is blank). The two seats hand over via a remembered position, so the first send flies the pill from the tool row down to the dock. Reads the active session's model provider from the model-directory store (`ctx.modelDirectories`), maps it to a `kind`, and polls the host route every 60s, on click, on session change, and on model switch. Each provider's payload is shaped by its own renderer. |
 
 The browser bundle is served by the host's client-module pipeline in the `window.__ModuleLoader__.load({ id, factory })` closure format the web shell consumes; `react` and the `@deepseek-ai/*` platform modules stay external and resolve from the browser's frozen module table.
 
