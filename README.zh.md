@@ -9,7 +9,7 @@
 
 [English](README.md) | **中文**
 
-一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件：在侧边栏底部、紧挨设置按钮的右侧，显示**当前活跃模型所属服务商的账户余额**，并保持实时刷新。
+一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件：在输入框下方状态条的最右端（上下文百分比指示器之后），显示**当前活跃模型所属服务商的账户余额**，并保持实时刷新。
 
 这个余额胶囊是**感知服务商的**：它会读取当前会话所选的模型，显示对应服务商的余额，并在你切换模型时自动跟着切换。
 
@@ -51,13 +51,13 @@
 |---|---|
 | **运行时依赖** | **零** —— `dependencies: {}`；唯一的 import 是 `@deepseek-ai/*` 平台模块与 React，均由运行中的 Harness 以可选 peer 提供 |
 | **产物体积** | 宿主端 **约 8 kB**（gzip 3.1 kB）+ 浏览器端 **约 23 kB**（gzip 8.1 kB）→ **gzip 合计约 11 kB** |
-| **Harness 接触面** | **一条**精确路由（`GET /plugins/balance`）与已声明 `sidebar.footer.action` 插槽中的**一个**组件 |
+| **Harness 接触面** | **一条**精确路由（`GET /plugins/balance`）与已声明 `conversation.composer.dock` 插槽中的**一个**组件 |
 | **核心补丁** | **无** —— 不 fork 文件、不修补核心 CSS；插件只从自己的 DOM 锚点设置自己那一行底栏的样式 |
 | **后台任务** | 无 —— 没有数据库、没有 worker、没有遥测、没有全局状态；每个胶囊只有一个 `setInterval`，卸载时清除 |
 | **生命周期** | 路由通过 `ctx.effect` 注册，卸载时自动回收；模型目录订阅会取消订阅；卸载插件后不会留下任何残留 |
 | **故障隔离** | 缺少密钥或上游出错时降级为灰色胶囊，绝不会阻塞会话或界面 |
 
-> **无需配置，也无需清理。** 安装后唯一的变化是侧边栏底部多了一行；卸载后 Harness 与原来完全一致。
+> **无需配置，也无需清理。** 安装后唯一的变化是输入框下方状态条多了一枚胶囊；卸载后 Harness 与原来完全一致。
 
 ## 亮点
 
@@ -70,6 +70,8 @@
 - **无需账号即可预览。** 内置 mock 模式，可为任意服务商渲染出逼真的余额。
 
 ## 截图
+
+> 下图为 0.5.0 之前的侧边栏布局；自 0.5.0 起，胶囊位于输入框下方状态条的最右端。
 
 <table>
   <tr>
@@ -106,8 +108,8 @@
 - **悬停提示** —— 完整明细（例如 `Total $42.50 · Granted $5.00 · Topped up $37.50`）。
 - **点击** —— 立即刷新。
 - **错误** —— 灰色 `Balance —` 胶囊；悬停查看原因，点击重试。
-- **窄侧边栏** —— 胶囊只占用自身内容所需的宽度，其余空间全部留给旁边的账号标签；胶囊不会隐藏金额，由标签以省略号截断。
-- 侧边栏折叠为 56px 轨道时会隐藏该胶囊——齿轮旁边放不下。
+- **紧凑设计** —— 胶囊与活动、用量、上下文指示器处于同一行高，只占用自身内容所需的宽度，且从不隐藏金额。
+- 状态条只在会话的输入框视图中渲染——首页不会显示胶囊。
 
 ### DeepSeek 高峰 / 空闲时段
 
@@ -134,7 +136,7 @@ DeepSeek 的**空闲时段价格为高峰时段的一半**。胶囊通过状态�
 
 前置条件：带有 web profile 的 DeepSeek Harness（`dsh web`）以及 Node.js ≥ 22.18。
 
-> 插件是自包含的：不需要额外服务、不需要配置文件、不需要核心补丁。安装只会新增一个依赖和侧边栏中的一行。
+> 插件是自包含的：不需要额外服务、不需要配置文件、不需要核心补丁。安装只会新增一个依赖和状态条中的一枚胶囊。
 
 ### 从 npm 安装
 
@@ -164,7 +166,7 @@ pnpm dsh plugin --profile web add link:"$PWD"
 
 ### 这一行是如何接入的
 
-本包声明了 **`dsh.bundle`**，因此 `dsh plugin add` 会自动把它追加到 profile 的 `dsh.profile.bundles`，并由包内自带的 `cordis.patch.yml` 插入侧边栏那一行——**无需手动修改补丁文件**。首次安装后刷新一次浏览器，让启动清单（`window.__DSH_BOOT__`）识别新增的行；之后源码改动会重建并热替换。
+本包声明了 **`dsh.bundle`**，因此 `dsh plugin add` 会自动把它追加到 profile 的 `dsh.profile.bundles`，并由包内自带的 `cordis.patch.yml` 插入插件那一行——**无需手动修改补丁文件**。首次安装后刷新一次浏览器，让启动清单（`window.__DSH_BOOT__`）识别新增的行；之后源码改动会重建并热替换。
 
 <details>
 <summary>手动管理 profile（或使用忽略 <code>dsh.bundle</code> 的旧版 <code>dsh</code>）</summary>
@@ -239,7 +241,7 @@ DSH_BALANCE_MOCK=1 dsh web
 |---|---|---|
 | Bundle 层 | `cordis.patch.yml` | 由 `dsh.bundle` 声明；当 profile 列出本包时插入 `dsh-balance` 行，因此 `dsh plugin add` 无需手动修改补丁文件。 |
 | 宿主端（Node） | `src/index.ts` | 在宿主 Web 服务器上注册 `GET /plugins/balance?kind=…`。通过凭证接缝（以及新增服务商的启动环境）解析密钥，请求服务商，并转发归一化后的余额。**密钥不会经过网络传到浏览器。** |
-| 浏览器端 | `src/client/index.tsx` | 将 `BalanceChip` 组件注册到 `sidebar.footer.action` 插槽。从模型目录存储（`ctx.modelDirectories`）读取当前会话的模型服务商，映射为 `kind`，并每 60 秒、点击时、会话切换时、模型切换时轮询宿主路由。每种服务的返回数据由各自的渲染器整形。 |
+| 浏览器端 | `src/client/index.tsx` | 将 `BalanceChip` 组件注册到 `conversation.composer.dock` 插槽，并固定在状态条最右端。从模型目录存储（`ctx.modelDirectories`）读取当前会话的模型服务商，映射为 `kind`，并每 60 秒、点击时、会话切换时、模型切换时轮询宿主路由。每种服务的返回数据由各自的渲染器整形。 |
 
 浏览器端产物由宿主的 client-module 流水线以 Web 外壳所需的 `window.__ModuleLoader__.load({ id, factory })` 闭包格式提供；`react` 与 `@deepseek-ai/*` 平台模块保持外部依赖，从浏览器冻结的模块表中解析。
 
@@ -264,7 +266,7 @@ pnpm run verify    # 在桩模块表上执行客户端产物并校验契约
 | 显示 `Balance —` 且提示 `Set DEEPSEEK_API_KEY …` | 凭证无法解析。请写入 `~/.dsh/.credentials.yaml` 或启动环境。 |
 | 其他服务商却显示 DeepSeek 余额 | 该路由 id 不在上面的映射表中——请带上路由 id 提交 issue。 |
 | 重命名包之后胶囊消失 | client-module 的 id 就是包名；请确认 `cordis.patch.yml` 中的行与 `dsh.profile.bundles` 中的条目都与 `package.json` 一致，然后重启 `dsh web`。 |
-| 折叠侧边栏后胶囊消失 | 正常现象——56px 轨道中齿轮旁没有空间。 |
+| 首页看不到胶囊 | 正常现象——状态条只在会话的输入框视图中渲染。 |
 | Moonshot 或 Zhipu 返回上游 `401`/`403` | 密钥属于另一个区域主机；插件已尝试镜像站点，若仍报错说明该密钥在两个站点都无效。 |
 
 ## 常见问答
@@ -273,11 +275,11 @@ pnpm run verify    # 在桩模块表上执行客户端产物并校验契约
 
 **卸载后会影响 Harness 吗？** 不会。它只注册了一条路由和一个插槽组件，两者都归插件所有。卸载后 Harness 与原来完全一致——核心没有任何改动。
 
-**运行成本如何？** 每个打开的标签页每分钟一次很小的本地 HTTP 请求，且只在侧边栏展开时发生。mock 模式完全不请求服务商。
+**运行成本如何？** 每个打开的标签页每分钟一次很小的本地 HTTP 请求，且只在打开会话视图时发生。mock 模式完全不请求服务商。
 
 **为什么自定义服务商显示 DeepSeek 余额？** 未知路由会刻意回退到 DeepSeek，而不是让胶囊报错。请带上路由 id 提交 issue，即可补充映射。
 
-**headless/CLI 会话能用吗？** 胶囊是 Web 侧边栏功能；只要 profile 挂载了 Web 服务器，宿主路由在任何 profile 下都可用，但没有 Web UI 就没有胶囊可渲染。
+**headless/CLI 会话能用吗？** 胶囊是 Web UI 功能；只要 profile 挂载了 Web 服务器，宿主路由在任何 profile 下都可用，但没有 Web UI 就没有胶囊可渲染。
 
 ## 更新日志
 

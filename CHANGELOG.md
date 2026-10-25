@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.5.0] — 2026-10-26
+
+### Changed
+
+- The chip moved from the sidebar foot to the **composer dock** — the status strip
+  below the search bar that carries the activity, usage and context pills. It
+  registers on the `conversation.composer.dock` slot (order 100, behind the chat's
+  own entries) and is pinned to the strip's **right end**, after the context
+  meter, by writing a large CSS `order` on its slot outlet (`applyDockOrder`).
+  The outlet is the dock row's real flex child — the slot runtime wraps every
+  list entry in a `[data-slot]` element — so the order goes there (and on the
+  anchor, covering runtimes that render the entry directly), and both values are
+  restored on unmount.
+- The chip is restyled as a compact strip pill (20px line, no box of its own) so
+  it reads as one of the dock's items instead of a button dropped onto it.
+- `dsh.client.inject` and the peer list now name
+  `@deepseek-ai/dsh-client-ui-conversation` instead of
+  `@deepseek-ai/dsh-client-ui-sidebar`.
+
+### Removed
+
+- The sidebar-foot rescue (`applySidebarFooterLayout`, `applyFooterFlex`,
+  `collectStyleOwners`, `clearFooterStyles`) and the `wide` owner-share prop —
+  the dock renders only in a session's composer view, so the collapsed-rail
+  special case and the two-seat flex rewrite are both obsolete.
+
 ## [0.4.3] — 2026-09-28
 
 ### Fixed

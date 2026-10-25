@@ -1,6 +1,7 @@
 // Simulate the DSH browser module table to verify lib/client.js evaluates,
 // registers with __ModuleLoader__, exports the plugin contract, applies into
-// the sidebar.footer.action slot, and the registered entry is the balance chip.
+// the conversation.composer.dock slot, and the registered entry is the balance
+// chip.
 import { readFileSync } from 'node:fs'
 
 /** The client-module entry id: the DSH node half derives it from the package name. */
@@ -98,17 +99,18 @@ const ctx = {
 }
 mod.apply(ctx)
 console.log('slots.inject called with:', injected)
-if (injected.length !== 1 || injected[0] !== 'sidebar.footer.action') throw new Error('slot injection mismatch')
+if (injected.length !== 1 || injected[0] !== 'conversation.composer.dock') throw new Error('slot injection mismatch')
 
 const disposer = injectedCb()
 console.log('register opts:', JSON.stringify(registered.opts))
-if (registered.opts.name !== 'sidebar.footer.action' || registered.opts.id !== 'balance') throw new Error('register opts mismatch')
+if (registered.opts.name !== 'conversation.composer.dock' || registered.opts.id !== 'balance') throw new Error('register opts mismatch')
+if (registered.opts.order !== 100) throw new Error(`register order mismatch: ${registered.opts.order}`)
 if (typeof disposer !== 'function') throw new Error('register must return a disposer')
 
-// The registered entry is the chip wrapper: invoking it with the owner share
-// and the standard `useSessions` seat returns an element (a jsx descriptor
-// whose `type` is the BalanceChip component).
-const el = registered.component({ wide: true, useSessions: () => undefined })
+// The registered entry is the chip wrapper: invoking it with the standard
+// `useSessions` seat returns an element (a jsx descriptor whose `type` is the
+// BalanceChip component).
+const el = registered.component({ useSessions: () => undefined })
 console.log('registered entry render type:', typeof el.type)
 if (typeof el.type !== 'function') throw new Error('the registered entry should render a component')
 
@@ -136,7 +138,6 @@ async function requestedKind({ provider, absent = false, throws = false, noSessi
     },
   }
   mod.BalanceChip({
-    wide: true,
     // `snapshot` drives the chip's OWN session selector over a real snapshot
     // shape; otherwise the seat is stubbed with a fixed session id.
     useSessions: snapshot === undefined

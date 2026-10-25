@@ -9,7 +9,7 @@
 
 **English** | [中文](README.zh.md)
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that puts the **account balance of the provider serving your active model** in the sidebar foot — right-aligned next to the Settings button — and keeps it fresh.
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that puts the **account balance of the provider serving your active model** in the status strip below the composer — at its right end, after the context meter — and keeps it fresh.
 
 The chip is **provider-aware**: it reads the active session's selected model and shows the matching provider's balance, flipping automatically when you switch models.
 
@@ -51,13 +51,13 @@ On DeepSeek the chip also tracks **peak / off-peak billing** — the status dot 
 |---|---|
 | **Runtime dependencies** | **none** — `dependencies: {}`; the only imports are `@deepseek-ai/*` platform modules and React, all supplied by the running Harness as optional peers |
 | **Bundle size** | host half **~8 kB** (3.1 kB gzip) + browser half **~23 kB** (8.1 kB gzip) → **~11 kB gzip combined** |
-| **Harness surface** | **one** exact route (`GET /plugins/balance`) and **one** component in the declared `sidebar.footer.action` slot |
-| **Core patches** | **none** — no forked files and no core CSS patch; the plugin styles only its own footer row from its own DOM anchor |
+| **Harness surface** | **one** exact route (`GET /plugins/balance`) and **one** component in the declared `conversation.composer.dock` slot |
+| **Core patches** | **none** — no forked files and no core CSS patch; the plugin styles only its own dock entry from its own DOM anchor |
 | **Background work** | none — no database, no worker, no telemetry, no global state; a single `setInterval` per chip, cleared on unmount |
 | **Lifecycle** | the route is registered through `ctx.effect`, so it unwinds on unload; model-directory subscriptions unsubscribe; removing the plugin leaves nothing behind |
 | **Failure isolation** | a missing key or an upstream error degrades to a muted pill — it never blocks a session or the UI |
 
-> **Nothing to configure, nothing to tear down.** Install it and the only change is one row in the sidebar foot. Uninstall it and the Harness is exactly as it was.
+> **Nothing to configure, nothing to tear down.** Install it and the only change is one pill in the composer dock strip. Uninstall it and the Harness is exactly as it was.
 
 ## Highlights
 
@@ -70,6 +70,8 @@ On DeepSeek the chip also tracks **peak / off-peak billing** — the status dot 
 - **Preview without an account.** A built-in mock mode renders real-looking balances for any provider.
 
 ## Screenshots
+
+> The images below show the pre-0.5.0 sidebar placement; from 0.5.0 the chip sits at the right end of the composer dock strip.
 
 <p>
   <img src="assets/footer.png" alt="The sidebar footer: Settings on the left, the balance chip on the right" width="420">
@@ -109,8 +111,8 @@ The mapping is deliberately narrow: a route the plugin does not recognize (inclu
 - **Tooltip** — the full breakdown (for example `Total $42.50 · Granted $5.00 · Topped up $37.50`).
 - **Click** — refresh now.
 - **Errors** — a muted `Balance —` pill; hover for the reason, click to retry.
-- **Narrow sidebars** — the chip takes exactly the width its own content needs and the account label beside it gets the rest. The chip never gives up its amount; the label truncates with an ellipsis instead.
-- The collapsed 56px sidebar rail hides the chip — there is no room beside the gear.
+- **Compact by design** — the chip is a slim pill on the same text line as the activity, usage and context pills, and it takes exactly the width its own content needs. The chip never gives up its amount.
+- The dock renders only in a session's composer view — the hero screen shows no chip.
 
 ### DeepSeek peak / off-peak hours
 
@@ -137,7 +139,7 @@ Source: [DeepSeek API — Models & Pricing](https://api-docs.deepseek.com/quick_
 
 Requirements: a DeepSeek Harness install with the web profile (`dsh web`) and Node.js ≥ 22.18.
 
-> The plugin is self-contained: it needs no extra services, no configuration file, and no core patch. Installation adds one dependency and one sidebar row.
+> The plugin is self-contained: it needs no extra services, no configuration file, and no core patch. Installation adds one dependency and one status-strip pill.
 
 ### From npm
 
@@ -167,7 +169,7 @@ Use `link:` rather than `file:`: a plain `file:` dependency is hardlinked and br
 
 ### How the row is wired
 
-The package declares **`dsh.bundle`**, so `dsh plugin add` appends it to your profile's `dsh.profile.bundles` and the bundle's own `cordis.patch.yml` inserts the sidebar row — **no manual patch editing**. Refresh the browser once after the first install so the boot manifest (`window.__DSH_BOOT__`) picks up the new row; after that, source changes rebuild and hot-swap live.
+The package declares **`dsh.bundle`**, so `dsh plugin add` appends it to your profile's `dsh.profile.bundles` and the bundle's own `cordis.patch.yml` inserts the plugin row — **no manual patch editing**. Refresh the browser once after the first install so the boot manifest (`window.__DSH_BOOT__`) picks up the new row; after that, source changes rebuild and hot-swap live.
 
 <details>
 <summary>Managing the profile by hand (or an older <code>dsh</code> that ignores <code>dsh.bundle</code>)</summary>
@@ -242,7 +244,7 @@ Then add a route in **Settings → Models** for the provider you want to preview
 |---|---|---|
 | Bundle layer | `cordis.patch.yml` | Declared by `dsh.bundle`; inserts the `dsh-balance` row when a profile lists the package, so `dsh plugin add` needs no manual patch editing. |
 | Host (Node) | `src/index.ts` | Registers `GET /plugins/balance?kind=…` on the host web server. Resolves the key through the credentials seam (and the launch environment for the added providers), calls the provider, and relays a normalized balance. **The key never crosses the wire to the browser.** |
-| Browser | `src/client/index.tsx` | Registers the `BalanceChip` component into the `sidebar.footer.action` slot. Reads the active session's model provider from the model-directory store (`ctx.modelDirectories`), maps it to a `kind`, and polls the host route every 60s, on click, on session change, and on model switch. Each provider's payload is shaped by its own renderer. |
+| Browser | `src/client/index.tsx` | Registers the `BalanceChip` component into the `conversation.composer.dock` slot, pinned to the strip's right end. Reads the active session's model provider from the model-directory store (`ctx.modelDirectories`), maps it to a `kind`, and polls the host route every 60s, on click, on session change, and on model switch. Each provider's payload is shaped by its own renderer. |
 
 The browser bundle is served by the host's client-module pipeline in the `window.__ModuleLoader__.load({ id, factory })` closure format the web shell consumes; `react` and the `@deepseek-ai/*` platform modules stay external and resolve from the browser's frozen module table.
 
@@ -276,11 +278,11 @@ The `@deepseek-ai/*` platform packages are **optional peer dependencies** suppli
 
 **Will it break the Harness if I remove it?** No. It registers one route and one slot component, both owned by the plugin. Uninstall it and the Harness is exactly as it was — nothing in the core is modified.
 
-**What does it cost to run?** One small local HTTP request per minute per open tab, and only while the sidebar is wide. Mock mode makes no provider requests at all.
+**What does it cost to run?** One small local HTTP request per minute per open tab, and only while a session view is open. Mock mode makes no provider requests at all.
 
 **Why does a custom provider show the DeepSeek balance?** Unknown routes deliberately fall back to DeepSeek instead of failing the chip. Open an issue with the route id and it can be added.
 
-**Does it work with a headless/CLI session?** The chip is a web-sidebar feature; the host route works in any profile that mounts the web server, but there is no chip to render without the web UI.
+**Does it work with a headless/CLI session?** The chip is a web-UI feature; the host route works in any profile that mounts the web server, but there is no chip to render without the web UI.
 
 ## Changelog
 

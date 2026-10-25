@@ -1,7 +1,7 @@
 {
   "name": "@andrecgoncalves/dsh-balance",
-  "version": "0.4.3",
-  "description": "Provider-aware account balance chip for the DeepSeek Harness web sidebar: DeepSeek, OpenRouter, Moonshot/Kimi, Zhipu/GLM, and MiniMax.",
+  "version": "0.5.0",
+  "description": "Provider-aware account balance chip for the DeepSeek Harness composer dock status strip: DeepSeek, OpenRouter, Moonshot/Kimi, Zhipu/GLM, and MiniMax.",
   "license": "MIT",
   "author": {
     "name": "Andre Goncalves",
@@ -9,11 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/andregoncalves/dsh-balance.git"
+    "url": "git+https://github.com/adithyanraj03/dsh-balance-plugin.git"
   },
-  "homepage": "https://github.com/andregoncalves/dsh-balance#readme",
+  "homepage": "https://github.com/adithyanraj03/dsh-balance-plugin#readme",
   "bugs": {
-    "url": "https://github.com/andregoncalves/dsh-balance/issues"
+    "url": "https://github.com/adithyanraj03/dsh-balance-plugin/issues"
   },
   "keywords": [
     "deepseek",
@@ -67,7 +67,7 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-sidebar"
+        "@deepseek-ai/dsh-client-ui-conversation"
       ],
       "immediately": false
     }
@@ -87,7 +87,7 @@
     "@deepseek-ai/cordis": "*",
     "@deepseek-ai/dsh-api-remotes": "*",
     "@deepseek-ai/dsh-client-runtime": "*",
-    "@deepseek-ai/dsh-client-ui-sidebar": "*",
+    "@deepseek-ai/dsh-client-ui-conversation": "*",
     "@deepseek-ai/dsh-client-ui-slots": "*",
     "@deepseek-ai/dsh-credentials": "*",
     "@deepseek-ai/dsh-host-webserver": "*",
@@ -104,7 +104,7 @@
     "@deepseek-ai/dsh-client-runtime": {
       "optional": true
     },
-    "@deepseek-ai/dsh-client-ui-sidebar": {
+    "@deepseek-ai/dsh-client-ui-conversation": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-slots": {
