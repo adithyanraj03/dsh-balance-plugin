@@ -801,24 +801,24 @@ export function chipTimer(now: Date = new Date()): ChipTimer | undefined {
 }
 
 /**
- * The right edge the popover may occupy. It floats `position: fixed` above
- * the app, so it can extend past the conversation column into empty chrome —
- * the chip sits at the column's right edge, so clamping to the column would
- * push every popover left. What it must not do is hide under a side panel.
- * panel. Panels may displace the column or overlay it, so a sibling counts
- * only when it starts at/after the column's right edge (displacing) or is a
- * floating (fixed/absolute/sticky) element starting inside it (overlaying) —
- * the conversation's own static flow, like the message list spanning the
- * full width, must not read as a panel. The walk continues through body
- * (panels often portal to the top level) and the nearest left edge wins.
- * With no panel anywhere, the window edge is.
+ * The horizontal lane the popover may occupy. It floats `position: fixed`
+ * above the app, so it can extend past the conversation column into empty
+ * chrome — the chip sits at the column's right edge, so clamping to the
+ * column would push every popover left. What it must not do is hide behind
+ * a bar: a right side panel or a left sidebar. Walk from the chip's laid-out
+ * row up through every ancestor (body included — panels often portal to the
+ * top level); a tall, wide sibling bounds the lane when it displaces the
+ * column (starts at its edge) or floats over it (`fixed`/`absolute`/`sticky`
+ * starting inside it) — the conversation's own static flow, like the message
+ * list spanning the full width, must not read as a bar. The nearest edges
+ * win; with no bars, the window edges do.
  * @param anchor - the chip's own element.
- * @returns the x the popover's right edge must stay left of.
+ * @returns the x the popover's left and right edges must stay inside.
  */
-export function popoverBoundary(anchor: HTMLElement): number {
-  const windowRight = window.innerWidth - 8
+export function popoverBounds(anchor: HTMLElement): { left: number; right: number } {
   const slot = anchor.closest<HTMLElement>('[data-slot]')
-  let boundary = windowRight
+  let left = 8
+  let right = window.innerWidth - 8
   let node: HTMLElement | null = slot?.parentElement ?? anchor.parentElement
   while (node !== null) {
     const parent: HTMLElement | null = node.parentElement
@@ -827,19 +827,22 @@ export function popoverBoundary(anchor: HTMLElement): number {
     for (const sibling of Array.from(parent.children)) {
       if (sibling === node) continue
       const r = sibling.getBoundingClientRect()
-      // Docked to the window's right edge, tall and wide: a candidate panel.
-      if (r.right < window.innerWidth - 2 || r.height <= 200 || r.width <= 100) continue
+      if (r.height <= 200 || r.width <= 100) continue
       const position = getComputedStyle(sibling).position
       const floating = position === 'fixed' || position === 'absolute' || position === 'sticky'
-      // Displacing (starts where the column ends) or overlaying (floats over
-      // its middle). Static flow that merely spans the width is not a panel.
-      if (r.left >= own.right - 1 || (floating && r.left > own.left + 8)) {
-        boundary = Math.min(boundary, r.left - 8)
+      // Right-docked bar: displacing or overlaying. Static flow that merely
+      // spans the width is not a bar.
+      if (r.right >= window.innerWidth - 2 && (r.left >= own.right - 1 || (floating && r.left > own.left + 8))) {
+        right = Math.min(right, r.left - 8)
+      }
+      // Left-docked rail: the mirror test.
+      if (r.left <= 2 && (r.right <= own.left + 1 || (floating && r.right < own.right - 8))) {
+        left = Math.max(left, r.right + 8)
       }
     }
     node = parent
   }
-  return Math.max(208, boundary)
+  return { left, right: Math.max(left + 200, right) }
 }
 
 /** Hover panel in the DSH popover idiom: elevated layer, hairline border, 12px text. */
@@ -958,22 +961,21 @@ function ClockGlyph() {
  * is `position: fixed` from the chip's measured rect, so no ancestor's
  * overflow can clip it, and it anchors ABOVE the chip (both seats sit low in
  * the window). Horizontally it centers on the chip — the icon is the pivot
- * — and the conversation column's right edge is passed in as a boundary:
- * when a docked side panel narrows the column, the panel slides to stay
- * inside it, gliding on the `left` transition rather than jumping under
- * the panel.
- * @param props - the display state, the chip's viewport rect, and the right
- * boundary the popover must stay inside.
+ * — and the free lane between the bars (side panel, sidebar) is passed in:
+ * the panel slides the minimum distance to stay inside it, gliding on the
+ * `left` transition rather than jumping under a bar.
+ * @param props - the display state, the chip's viewport rect, and the lane
+ * the popover must stay inside.
  * @returns the tooltip element.
  */
-function ChipTooltip({ state, rect, boundary }: { readonly state: DisplayState; readonly rect: DOMRect; readonly boundary: number }) {
+function ChipTooltip({ state, rect, bounds }: { readonly state: DisplayState; readonly rect: DOMRect; readonly bounds: { left: number; right: number } }) {
   const lines = tooltipLines(state)
-  // Center the panel on the chip — the icon is the pivot — then clamp it
-  // inside the boundary, so it only shifts when a side panel or the window
-  // edge would otherwise cover it.
-  const width = Math.min(340, Math.max(200, boundary - 8))
+  // Center the panel on the chip — the icon is the pivot — then shift it the
+  // minimum distance to stay inside the lane between the bars, so it only
+  // moves when a panel, rail, or the window edge would otherwise occlude it.
+  const width = Math.min(340, Math.max(200, bounds.right - bounds.left))
   const center = rect.left + rect.width / 2
-  const left = Math.max(8, Math.min(center - width / 2, boundary - width))
+  const left = Math.max(bounds.left, Math.min(center - width / 2, bounds.right - width))
   const peakInk = 'var(--dsw-alias-state-error-primary)'
   const offInk = 'var(--dsw-alias-state-success-primary)'
   const accent = state.kind !== 'ok'
@@ -1131,7 +1133,7 @@ export function BalanceChip({
 }) {
   const [state, setState] = useState<DisplayState>({ kind: 'loading' })
   const anchorRef = useRef<HTMLDivElement>(null)
-  const [tip, setTip] = useState<{ rect: DOMRect; boundary: number } | null>(null)
+  const [tip, setTip] = useState<{ rect: DOMRect; bounds: { left: number; right: number } } | null>(null)
   const activeSession = useSessions(
     (snapshot) => currentSessionId(snapshot as unknown as SessionsSnapshotLike),
   )
@@ -1239,7 +1241,7 @@ export function BalanceChip({
   const showTip = useCallback(() => {
     const anchor = anchorRef.current
     if (anchor === null) return
-    setTip({ rect: anchor.getBoundingClientRect(), boundary: popoverBoundary(anchor) })
+    setTip({ rect: anchor.getBoundingClientRect(), bounds: popoverBounds(anchor) })
   }, [])
   const hideTip = useCallback(() => { setTip(null) }, [])
 
@@ -1312,7 +1314,7 @@ export function BalanceChip({
           )}
         </button>
       )}
-      {tip !== null && <ChipTooltip state={state} rect={tip.rect} boundary={tip.boundary} />}
+      {tip !== null && <ChipTooltip state={state} rect={tip.rect} bounds={tip.bounds} />}
     </div>
   )
 }
