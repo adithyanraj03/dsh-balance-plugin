@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.3] — 2026-10-27
+
+### Changed
+
+- The popover now **centers on the chip** — the icon is the pivot — instead
+  of hanging from its left edge. It only shifts off-center when the
+  conversation column's boundary (a docked side panel) or the window edge
+  would otherwise cover it, still gliding on the `left` transition.
+
 ## [0.10.2] — 2026-10-27
 
 ### Changed

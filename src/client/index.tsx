@@ -915,19 +915,23 @@ function ClockGlyph() {
  * emphasized, and a hairline separates the content from the footer hint. It
  * is `position: fixed` from the chip's measured rect, so no ancestor's
  * overflow can clip it, and it anchors ABOVE the chip (both seats sit low in
- * the window). Horizontally it hangs rightward from the chip's left edge —
- * the look — but the conversation column's right edge is passed in as a
- * boundary: when a docked side panel narrows the column, the panel slides
- * left to stay inside it, gliding on the `left` transition rather than
- * jumping under the panel.
+ * the window). Horizontally it centers on the chip — the icon is the pivot
+ * — and the conversation column's right edge is passed in as a boundary:
+ * when a docked side panel narrows the column, the panel slides to stay
+ * inside it, gliding on the `left` transition rather than jumping under
+ * the panel.
  * @param props - the display state, the chip's viewport rect, and the right
  * boundary the popover must stay inside.
  * @returns the tooltip element.
  */
 function ChipTooltip({ state, rect, boundary }: { readonly state: DisplayState; readonly rect: DOMRect; readonly boundary: number }) {
   const lines = tooltipLines(state)
+  // Center the panel on the chip — the icon is the pivot — then clamp it
+  // inside the boundary, so it only shifts when a side panel or the window
+  // edge would otherwise cover it.
   const width = Math.min(340, Math.max(200, boundary - 8))
-  const left = Math.max(8, Math.min(rect.left, boundary - width))
+  const center = rect.left + rect.width / 2
+  const left = Math.max(8, Math.min(center - width / 2, boundary - width))
   const peakInk = 'var(--dsw-alias-state-error-primary)'
   const offInk = 'var(--dsw-alias-state-success-primary)'
   const accent = state.kind !== 'ok'
