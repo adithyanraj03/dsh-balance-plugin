@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.0] — 2026-10-27
+
+### Changed
+
+- The chip timer is now a **tinted pill with an animated clock** (chosen from
+  a design board): a hairline dial whose hand sweeps a full turn, rests, and
+  turns again with a small pop as it lands, beside the tabular countdown.
+- The relief ink is **teal** (`#2fbfa0`) instead of the success green — peak
+  draining reads calm and stays distinct from the red dot; the warning ink
+  (peak approaching) stays the harness error red. The popover countdown picks
+  up the same teal.
+
 ## [0.9.0] — 2026-10-27
 
 ### Changed

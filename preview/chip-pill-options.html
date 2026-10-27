@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #131415;
+    --strip: #8b8e94;
+    --red: #e5534b;
+    --muted: #6e7177;
+    --g1: #4cb782; /* dsh success */
+    --g2: #5ad19a; /* mint */
+    --g3: #34a06a; /* emerald */
+    --g4: #2fbfa0; /* teal */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--strip); font: 12px/1.4 -apple-system, 'Segoe UI', system-ui, sans-serif; padding: 18px 20px 22px; width: 620px; }
+  h1 { font-size: 13px; color: #dcdde0; font-weight: 600; margin-bottom: 3px; }
+  p.sub { font-size: 11px; color: var(--muted); margin-bottom: 13px; }
+  .sec { margin: 15px 0 9px; font-size: 11px; color: #a7aab0; border-top: 0.5px solid #2a2b2e; padding-top: 12px; font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; background: #191a1c; border: 0.5px solid #2a2b2e; margin-bottom: 8px; }
+  .tag { width: 20px; font-weight: 700; font-size: 11px; color: #dcdde0; }
+  .desc { flex: 1; font-size: 11px; color: var(--muted); text-align: right; }
+  .pair { display: flex; align-items: center; gap: 22px; }
+  .state { font-size: 10px; color: var(--muted); margin-right: -16px; }
+  .chip { display: flex; align-items: center; gap: 6px; color: var(--strip); font-size: 12px; }
+  .logo { width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(from 210deg, #4d6bfe, #7fd3ff, #4d6bfe); }
+  .amount { font-variant-numeric: tabular-nums; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .dot.red { background: var(--red); }
+  .dot.green { background: var(--g1); }
+  .pill { font-size: 11px; font-variant-numeric: tabular-nums; padding: 0 7px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  /* soft tint (current B) */
+  .tint-g1 { color: var(--g1); background: rgba(76,183,130,.14); border: .5px solid rgba(76,183,130,.38); }
+  .tint-g2 { color: var(--g2); background: rgba(90,209,154,.14); border: .5px solid rgba(90,209,154,.38); }
+  .tint-g3 { color: var(--g3); background: rgba(52,160,106,.16); border: .5px solid rgba(52,160,106,.42); }
+  .tint-g4 { color: var(--g4); background: rgba(47,191,160,.14); border: .5px solid rgba(47,191,160,.38); }
+  .tint-r { color: var(--red); background: rgba(229,83,75,.14); border: .5px solid rgba(229,83,75,.38); }
+  /* design variants, g1 green + red pair */
+  .outline-g { color: var(--g1); background: transparent; border: .5px solid rgba(76,183,130,.6); }
+  .outline-r { color: var(--red); background: transparent; border: .5px solid rgba(229,83,75,.6); }
+  .solid-g { color: #0e1512; background: var(--g1); border: .5px solid var(--g1); }
+  .solid-r { color: #1a0f0e; background: var(--red); border: .5px solid var(--red); }
+  .flat-g { color: var(--g1); background: rgba(76,183,130,.18); border: none; }
+  .flat-r { color: var(--red); background: rgba(229,83,75,.18); border: none; }
+  .glyph-g { color: var(--g1); background: rgba(76,183,130,.14); border: .5px solid rgba(76,183,130,.38); }
+  .glyph-r { color: var(--red); background: rgba(229,83,75,.14); border: .5px solid rgba(229,83,75,.38); }
+</style>
+</head>
+<body>
+  <h1>Pill B — green tones &amp; pill designs</h1>
+  <p class="sub">each row: peak state (red dot + green relief pill) then off-peak last hour (green dot + red warning pill)</p>
+
+  <div class="sec">green tones (soft-tint pill)</div>
+
+  <div class="row"><span class="tag">G1</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill tint-g1">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill tint-r">45m</span></span>
+    </span>
+    <span class="desc">DSH success green — the app's own token</span>
+  </div>
+
+  <div class="row"><span class="tag">G2</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill tint-g2">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill tint-r">45m</span></span>
+    </span>
+    <span class="desc">mint — brighter, more readable on dark</span>
+  </div>
+
+  <div class="row"><span class="tag">G3</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill tint-g3">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill tint-r">45m</span></span>
+    </span>
+    <span class="desc">emerald — deeper, calmer</span>
+  </div>
+
+  <div class="row"><span class="tag">G4</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill tint-g4">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill tint-r">45m</span></span>
+    </span>
+    <span class="desc">teal — green-blue, most distinct from the red dot</span>
+  </div>
+
+  <div class="sec">pill designs (with G1 green)</div>
+
+  <div class="row"><span class="tag">P1</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill tint-g1">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill tint-r">45m</span></span>
+    </span>
+    <span class="desc">soft tint + hairline border (as mocked)</span>
+  </div>
+
+  <div class="row"><span class="tag">P2</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill outline-g">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill outline-r">45m</span></span>
+    </span>
+    <span class="desc">outline only — lightest footprint</span>
+  </div>
+
+  <div class="row"><span class="tag">P3</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill solid-g">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill solid-r">45m</span></span>
+    </span>
+    <span class="desc">solid fill — loudest, badge-like</span>
+  </div>
+
+  <div class="row"><span class="tag">P4</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill flat-g">1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill flat-r">45m</span></span>
+    </span>
+    <span class="desc">flat tint, no border — softest</span>
+  </div>
+
+  <div class="row"><span class="tag">P5</span>
+    <span class="pair">
+      <span class="state">peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot red"></span><span class="pill glyph-g">◷ 1h 22m</span></span>
+      <span class="state">off-peak</span><span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot green"></span><span class="pill glyph-r">◷ 45m</span></span>
+    </span>
+    <span class="desc">clock glyph prefix — reads as time at a glance</span>
+  </div>
+</body>
+</html>

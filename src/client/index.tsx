@@ -692,16 +692,28 @@ const URGENT_MS = 5 * 60_000
 /** The multi-color wave played by a near-zero countdown and chip timer. */
 const WAVE_ANIMATION = 'dsh-balance-wave 1.6s ease-in-out infinite'
 
+/** The relief ink the viewer picked: teal for "the peak is draining". */
+const TEAL_INK = '#2fbfa0'
+
+/** The clock hand's sweep: a full turn, then a rest, on a slow loop. */
+const CLOCK_SWEEP = 'dsh-balance-clock 3.6s cubic-bezier(0.65, 0, 0.35, 1) infinite'
+
+/** The small pop that lands when the hand completes its turn. */
+const CLOCK_POP = 'dsh-balance-clock-pop 3.6s ease-in-out infinite'
+
 /**
- * Inject the wave keyframes once per document: success → warn → error ink,
- * cycling. A plugin cannot ship a stylesheet, so the animation lives in a
- * single idempotent `<style>` element the first chip mounts.
+ * Inject the keyframes once per document: the wave (success → warn → error
+ * ink cycling) and the clock (a 360° hand sweep with a settle, plus the pop
+ * on the dial). A plugin cannot ship a stylesheet, so the animations live in
+ * a single idempotent `<style>` element the first chip mounts.
  */
 function ensureWaveKeyframes(): void {
   if (typeof document === 'undefined' || document.getElementById('dsh-balance-keyframes') !== null) return
   const style = document.createElement('style')
   style.id = 'dsh-balance-keyframes'
   style.textContent = '@keyframes dsh-balance-wave{0%,100%{color:var(--dsw-alias-state-success-primary)}30%{color:var(--dsw-alias-state-warn-primary)}60%{color:var(--dsw-alias-state-error-primary)}}'
+    + '@keyframes dsh-balance-clock{0%{transform:rotate(0deg)}40%{transform:rotate(360deg)}100%{transform:rotate(360deg)}}'
+    + '@keyframes dsh-balance-clock-pop{0%,100%{transform:scale(1)}30%{transform:scale(1.14)}45%{transform:scale(1)}}'
   document.head.appendChild(style)
 }
 
@@ -742,11 +754,9 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
       countdown,
       peak,
       // The countdown reads as relief or warning, so its ink is the OPPOSITE
-      // of the status: green while the red window drains away, red while it
+      // of the status: teal while the red window drains away, red while it
       // approaches through the last hour of off-peak.
-      countdownColor: peak
-        ? 'var(--dsw-alias-state-success-primary)'
-        : 'var(--dsw-alias-state-error-primary)',
+      countdownColor: peak ? TEAL_INK : 'var(--dsw-alias-state-error-primary)',
       urgent: countdown !== undefined && ms <= URGENT_MS,
     })
     lines.push({ text: peakWindowsLocalLabel(now), muted: true })
@@ -770,7 +780,7 @@ export interface ChipTimer {
  * The chip's inline timer: the countdown to the next billing boundary, shown
  * beside the dot — always during peak, and in the last hour of off-peak.
  * Undefined otherwise, so quiet off-peak hours and every other provider stay
- * bare. Its ink follows the tooltip's relief/warning rule (green while peak
+ * bare. Its ink follows the tooltip's relief/warning rule (teal while peak
  * drains, red while it approaches), and under five minutes it waves. Minute
  * granularity is the point: the chip repaints on the 60s poll, which keeps
  * the timer honest without a second clock.
@@ -786,9 +796,7 @@ export function chipTimer(now: Date = new Date()): ChipTimer | undefined {
     text: formatCountdown(ms),
     peak,
     urgent: ms <= URGENT_MS,
-    color: peak
-      ? 'var(--dsw-alias-state-success-primary)'
-      : 'var(--dsw-alias-state-error-primary)',
+    color: peak ? TEAL_INK : 'var(--dsw-alias-state-error-primary)',
   }
 }
 
@@ -829,11 +837,26 @@ const tooltipCountdownStyle: CSSProperties = {
   fontWeight: 700,
 }
 
-/** The timer beside the chip's dot: small, tabular, on the same text line. */
+/** The timer beside the chip's dot: a small pill, tabular, on the text line. */
 const chipTimerStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
   fontSize: 11,
-  color: 'var(--dsw-alias-label-tertiary)',
+  fontWeight: 600,
   fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
+  padding: '0 7px',
+  borderRadius: 999,
+}
+
+/** Tint wash for the chip timer pill, in the timer's own ink. */
+function timerPillStyle(color: string): CSSProperties {
+  return {
+    color,
+    background: `color-mix(in srgb, ${color} 14%, transparent)`,
+    border: `0.5px solid color-mix(in srgb, ${color} 38%, transparent)`,
+  }
 }
 
 /** Tinted pill holding the billing status word; `color` is the state token. */
@@ -853,6 +876,31 @@ function statusPillStyle(color: string): CSSProperties {
 /** The wave animation, unless the viewer opted out of motion. */
 function waveStyle(urgent: boolean | undefined): CSSProperties {
   return urgent === true && !prefersReducedMotion() ? { animation: WAVE_ANIMATION } : {}
+}
+
+/**
+ * The timer pill's clock mark: a hairline dial whose hand sweeps a full
+ * turn, rests, and turns again, with a small pop as the hand lands. The
+ * stroke is `currentColor`, so the sub-5-minute wave paints the dial too.
+ * Under `prefers-reduced-motion` the hand rests at twelve and nothing moves.
+ * @returns the glyph element.
+ */
+function ClockGlyph() {
+  const still = prefersReducedMotion()
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+      style={{ flex: 'none', overflow: 'visible', ...(still ? {} : { animation: CLOCK_POP }) }}
+    >
+      <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" strokeWidth="1.1" opacity="0.55" />
+      <g style={still ? undefined : { transformOrigin: '6px 6px', animation: CLOCK_SWEEP }}>
+        <line x1="6" y1="6" x2="6" y2="2.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </g>
+    </svg>
+  )
 }
 
 /**
@@ -1185,10 +1233,14 @@ export function BalanceChip({
           <span style={amountStyle}>{state.symbol}{state.total}</span>
           <span role="img" aria-label={state.detail} style={{ ...dotBaseStyle, background: state.dotColor }} />
           {/* DeepSeek carries its billing countdown right on the strip, next to
-              the dot — green while the peak drains, red while it approaches,
-              waving through the state colors in its final five minutes. */}
+              the dot: a tinted pill with a clock whose hand sweeps and pops —
+              teal while the peak drains, red while it approaches, waving
+              through the state colors in its final five minutes. */}
           {timer !== undefined && (
-            <span style={{ ...chipTimerStyle, color: timer.color, ...waveStyle(timer.urgent) }}>{timer.text}</span>
+            <span style={{ ...chipTimerStyle, ...timerPillStyle(timer.color), ...waveStyle(timer.urgent) }}>
+              <ClockGlyph />
+              {timer.text}
+            </span>
           )}
         </button>
       )}

@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #131415;
+    --strip: #8b8e94;
+    --red: #e5534b;
+    --green: #4cb782;
+    --amber: #d9822b;
+    --muted: #6e7177;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--strip); font: 12px/1.4 -apple-system, 'Segoe UI', system-ui, sans-serif; padding: 18px 20px 22px; width: 560px; }
+  h1 { font-size: 13px; color: #dcdde0; font-weight: 600; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; background: #191a1c; border: 0.5px solid #2a2b2e; margin-bottom: 9px; }
+  .tag { width: 18px; font-weight: 700; font-size: 11px; color: #dcdde0; }
+  .desc { flex: 1; font-size: 11px; color: var(--muted); text-align: right; }
+  .chip { display: flex; align-items: center; gap: 6px; color: var(--strip); font-size: 12px; }
+  .logo { width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(from 210deg, #4d6bfe, #7fd3ff, #4d6bfe); }
+  .amount { font-variant-numeric: tabular-nums; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex: none; }
+  .dot.green { background: var(--green); }
+  .timer { font-size: 11px; font-variant-numeric: tabular-nums; }
+  .timer.muted { color: var(--muted); }
+  .timer.red { color: var(--red); }
+  .timer.amber { color: var(--amber); }
+  .timer.pill {
+    color: var(--red); padding: 0 7px; border-radius: 999px; font-weight: 600;
+    background: rgba(229, 83, 75, 0.14); border: 0.5px solid rgba(229, 83, 75, 0.38);
+  }
+  .dot.pulse { position: relative; }
+  .dot.pulse::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%;
+    border: 1.5px solid rgba(229, 83, 75, 0.55);
+  }
+  .wave { background: linear-gradient(90deg, var(--green), var(--amber), var(--red)); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
+  .sep { margin: 16px 0 10px; font-size: 11px; color: var(--muted); border-top: 0.5px solid #2a2b2e; padding-top: 12px; }
+</style>
+</head>
+<body>
+  <h1>Balance chip — timer styling options <span style="color:#6e7177;font-weight:400">(peak now: red dot kept in all)</span></h1>
+  <p class="sub">current live strip for reference: 66% · $11.94 · red dot · green 22m</p>
+
+  <div class="row"><span class="tag">A</span>
+    <span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot"></span><span class="timer muted">22m</span></span>
+    <span class="desc">quiet grey timer — the dot alone carries the color</span>
+  </div>
+
+  <div class="row"><span class="tag">B</span>
+    <span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot"></span><span class="timer pill">22m</span></span>
+    <span class="desc">red tinted pill — matches the popover's status pill</span>
+  </div>
+
+  <div class="row"><span class="tag">C</span>
+    <span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot"></span><span class="timer red">22m</span></span>
+    <span class="desc">unified red — dot and timer read as one signal</span>
+  </div>
+
+  <div class="row"><span class="tag">D</span>
+    <span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot"></span><span class="timer amber">22m</span></span>
+    <span class="desc">amber timer — distinct from the dot, less alarm</span>
+  </div>
+
+  <div class="row"><span class="tag">E</span>
+    <span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot pulse"></span></span>
+    <span class="desc">no text — pulsing halo on the dot, timer lives in the tooltip</span>
+  </div>
+
+  <div class="sep">under 5 minutes to the boundary (wave) — applies to whichever option you pick:</div>
+
+  <div class="row"><span class="tag">W</span>
+    <span class="chip"><span class="logo"></span><span class="amount">$11.94</span><span class="dot"></span><span class="timer wave">3m</span></span>
+    <span class="desc">ink cycles green → amber → red (shown mid-cycle)</span>
+  </div>
+</body>
+</html>

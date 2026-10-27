@@ -63,6 +63,7 @@ function loadTooltip() {
     extractConst(bundle, 'HOUR_MS'),
     extractConst(bundle, 'DAY_MS'),
     extractConst(bundle, 'URGENT_MS'),
+    extractConst(bundle, 'TEAL_INK'),
     extractConst(bundle, 'PEAK_WINDOWS_UTC'),
     extractFunction(bundle, 'isPeakHour'),
     extractFunction(bundle, 'nextTransition'),
@@ -101,7 +102,7 @@ test('peak always counts down to off-peak', () => {
   assert.match(lines[0].text, /Peak billing$/)
   assert.equal(lines[0].countdown, 'off-peak in 2h')
   assert.equal(lines[0].peak, true)
-  assert.match(lines[0].countdownColor, /success/, 'relief ink while peak drains')
+  assert.equal(lines[0].countdownColor, '#2fbfa0', 'teal relief ink while peak drains')
   assert.equal(lines[0].urgent, false)
   assert.match(lines[1].text, /GMT\+5:30/)
   assert.equal(lines[2].detail, true)
@@ -125,7 +126,7 @@ test('the chip timer mirrors the tooltip countdown with relief/warning ink', () 
   assert.equal(peak.text, '2h')
   assert.equal(peak.peak, true)
   assert.equal(peak.urgent, false)
-  assert.match(peak.color, /success/, 'green while the peak drains')
+  assert.equal(peak.color, '#2fbfa0', 'teal relief ink while the peak drains')
   const near = chipTimer(new Date('2026-09-07T05:15:00Z'))
   assert.equal(near.text, '45m')
   assert.match(near.color, /error/, 'red while the peak approaches')
@@ -175,6 +176,11 @@ test('the tooltip is a styled DSH popover, not a native title', () => {
   assert.match(bundle, /color-mix\(in srgb/)
   assert.match(bundle, /borderLeft/)
   assert.match(bundle, /@keyframes dsh-balance-wave/)
+  // The timer pill's clock mark: sweeping hand + pop keyframes, painted with
+  // currentColor so the wave reaches the dial.
+  assert.match(bundle, /@keyframes dsh-balance-clock\{/)
+  assert.match(bundle, /@keyframes dsh-balance-clock-pop/)
+  assert.match(bundle, /stroke: "currentColor"/)
   // The chip elements carry no native title attribute any more.
   assert.doesNotMatch(bundle, /title: `Balance|title: `\$\{state\.title\}|title: "Loading balance/)
 })
