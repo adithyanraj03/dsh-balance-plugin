@@ -820,6 +820,7 @@ const tooltipStyle: CSSProperties = {
   whiteSpace: 'normal',
   pointerEvents: 'none',
   textAlign: 'left',
+  transition: 'left 220ms cubic-bezier(0.22, 0.61, 0.36, 1)',
 }
 
 /** Hairline separating the tooltip's content from its footer hint. */
@@ -913,20 +914,20 @@ function ClockGlyph() {
  * colors in its final five minutes. The breakdown's first segment is
  * emphasized, and a hairline separates the content from the footer hint. It
  * is `position: fixed` from the chip's measured rect, so no ancestor's
- * overflow can clip it. It anchors ABOVE the chip (both seats sit low in the
- * window) and hangs to the LEFT of it — the chip sits at the right end of
- * its strip, so a right-anchored panel stays inside the conversation column
- * even when a side panel is docked on the right, which would cover a
- * left-anchored one. Its width is capped to the space left of the chip.
- * @param props - the display state to describe and the chip's viewport rect.
+ * overflow can clip it, and it anchors ABOVE the chip (both seats sit low in
+ * the window). Horizontally it hangs rightward from the chip's left edge —
+ * the look — but the conversation column's right edge is passed in as a
+ * boundary: when a docked side panel narrows the column, the panel slides
+ * left to stay inside it, gliding on the `left` transition rather than
+ * jumping under the panel.
+ * @param props - the display state, the chip's viewport rect, and the right
+ * boundary the popover must stay inside.
  * @returns the tooltip element.
  */
-function ChipTooltip({ state, rect }: { readonly state: DisplayState; readonly rect: DOMRect }) {
+function ChipTooltip({ state, rect, boundary }: { readonly state: DisplayState; readonly rect: DOMRect; readonly boundary: number }) {
   const lines = tooltipLines(state)
-  // Right-anchor to the chip and cap the width to the room left of it, so a
-  // docked side panel (or a narrow window) can never cover the popover.
-  const right = Math.max(8, window.innerWidth - rect.right)
-  const maxWidth = Math.max(200, Math.min(340, rect.right - 8))
+  const width = Math.min(340, Math.max(200, boundary - 8))
+  const left = Math.max(8, Math.min(rect.left, boundary - width))
   const peakInk = 'var(--dsw-alias-state-error-primary)'
   const offInk = 'var(--dsw-alias-state-success-primary)'
   const accent = state.kind !== 'ok'
@@ -935,7 +936,7 @@ function ChipTooltip({ state, rect }: { readonly state: DisplayState; readonly r
       ? (isPeakHour() ? peakInk : offInk)
       : 'var(--dsw-alias-state-business-primary)'
   return (
-    <div role="tooltip" style={{ ...tooltipStyle, right, bottom: window.innerHeight - rect.top + 6, maxWidth, minWidth: Math.min(250, maxWidth), borderLeft: `3px solid ${accent}` }}>
+    <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6, width, minWidth: Math.min(250, width), borderLeft: `3px solid ${accent}` }}>
       {lines.flatMap((line, index) => {
         const isFooter = index === lines.length - 1
         const node = line.countdown !== undefined ? (
@@ -1084,7 +1085,7 @@ export function BalanceChip({
 }) {
   const [state, setState] = useState<DisplayState>({ kind: 'loading' })
   const anchorRef = useRef<HTMLDivElement>(null)
-  const [tipRect, setTipRect] = useState<DOMRect | null>(null)
+  const [tip, setTip] = useState<{ rect: DOMRect; boundary: number } | null>(null)
   const activeSession = useSessions(
     (snapshot) => currentSessionId(snapshot as unknown as SessionsSnapshotLike),
   )
@@ -1184,12 +1185,33 @@ export function BalanceChip({
   if (variant === 'hero' && !blank) return null
 
   // The tooltip measures the chip on show, so it can float `position: fixed`
-  // above the seat without being clipped by ancestor overflow.
+  // above the seat without being clipped by ancestor overflow. The boundary
+  // is the conversation column's right edge — the laid-out row the seat sits
+  // in — so a docked side panel can never cover the popover: it hangs from
+  // the chip's left normally, and slides left (smoothly, via the `left`
+  // transition) when the column is narrower than the panel.
   const showTip = useCallback(() => {
     const anchor = anchorRef.current
-    if (anchor !== null) setTipRect(anchor.getBoundingClientRect())
+    if (anchor === null) return
+    const slot = anchor.closest<HTMLElement>('[data-slot]')
+    const lane = slot?.parentElement ?? anchor.parentElement
+    const laneRight = lane !== null ? lane.getBoundingClientRect().right : window.innerWidth
+    setTip({
+      rect: anchor.getBoundingClientRect(),
+      boundary: Math.max(208, Math.min(window.innerWidth - 8, laneRight - 8)),
+    })
   }, [])
-  const hideTip = useCallback(() => { setTipRect(null) }, [])
+  const hideTip = useCallback(() => { setTip(null) }, [])
+
+  // While the popover is open, a window resize re-measures the seat and the
+  // boundary, so it glides to the new spot instead of stranding under the
+  // panel; the next hover re-measures regardless.
+  useEffect(() => {
+    if (tip === null) return
+    const onMove = () => { showTip() }
+    window.addEventListener('resize', onMove)
+    return () => { window.removeEventListener('resize', onMove) }
+  }, [tip !== null, showTip])
 
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll
   // repaints it). Undefined for every other provider and quiet off-peak.
@@ -1250,7 +1272,7 @@ export function BalanceChip({
           )}
         </button>
       )}
-      {tipRect !== null && <ChipTooltip state={state} rect={tipRect} />}
+      {tip !== null && <ChipTooltip state={state} rect={tip.rect} boundary={tip.boundary} />}
     </div>
   )
 }

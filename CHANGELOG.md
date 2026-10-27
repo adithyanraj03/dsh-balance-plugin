@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.2] — 2026-10-27
+
+### Changed
+
+- The popover keeps its original hang-right-from-the-chip look, but now
+  measures the conversation column's right edge when it opens: a docked side
+  panel narrows that column, and the popover **slides left to stay fully
+  visible** instead of hiding under the panel — gliding on a 220ms `left`
+  transition rather than jumping. A window resize while it is open
+  re-measures and re-slides it.
+
 ## [0.10.1] — 2026-10-27
 
 ### Fixed
