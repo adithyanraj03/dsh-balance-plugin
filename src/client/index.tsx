@@ -800,6 +800,38 @@ export function chipTimer(now: Date = new Date()): ChipTimer | undefined {
   }
 }
 
+/**
+ * The right edge the popover may occupy. It floats `position: fixed` above
+ * the app, so it can extend past the conversation column into empty chrome —
+ * the chip sits at the column's right edge, so clamping to the column would
+ * push every popover left. What it must not do is hide under a docked side
+ * panel. So: walk from the chip's laid-out row up through its ancestors and
+ * look for a tall sibling that starts where the column ends and reaches the
+ * window edge — that is the panel, and its left edge is the boundary. With
+ * no panel docked, the window edge is.
+ * @param anchor - the chip's own element.
+ * @returns the x the popover's right edge must stay left of.
+ */
+export function popoverBoundary(anchor: HTMLElement): number {
+  const windowRight = window.innerWidth - 8
+  const slot = anchor.closest<HTMLElement>('[data-slot]')
+  let node: HTMLElement | null = slot?.parentElement ?? anchor.parentElement
+  while (node !== null && node.parentElement !== null && node.parentElement !== document.body) {
+    const own = node.getBoundingClientRect()
+    for (const sibling of Array.from(node.parentElement.children)) {
+      if (sibling === node) continue
+      const r = sibling.getBoundingClientRect()
+      // Right-docked, tall, and starting at/after the column's right edge:
+      // the side panel. Left rails and toolbars start before it and pass.
+      if (r.left >= own.right - 1 && r.right >= window.innerWidth - 2 && r.height > 200 && r.width > 100) {
+        return Math.max(208, Math.min(windowRight, r.left - 8))
+      }
+    }
+    node = node.parentElement
+  }
+  return windowRight
+}
+
 /** Hover panel in the DSH popover idiom: elevated layer, hairline border, 12px text. */
 const tooltipStyle: CSSProperties = {
   position: 'fixed',
@@ -1197,13 +1229,7 @@ export function BalanceChip({
   const showTip = useCallback(() => {
     const anchor = anchorRef.current
     if (anchor === null) return
-    const slot = anchor.closest<HTMLElement>('[data-slot]')
-    const lane = slot?.parentElement ?? anchor.parentElement
-    const laneRight = lane !== null ? lane.getBoundingClientRect().right : window.innerWidth
-    setTip({
-      rect: anchor.getBoundingClientRect(),
-      boundary: Math.max(208, Math.min(window.innerWidth - 8, laneRight - 8)),
-    })
+    setTip({ rect: anchor.getBoundingClientRect(), boundary: popoverBoundary(anchor) })
   }, [])
   const hideTip = useCallback(() => { setTip(null) }, [])
 

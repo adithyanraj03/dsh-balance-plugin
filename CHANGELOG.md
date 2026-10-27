@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.4] — 2026-10-27
+
+### Fixed
+
+- The popover no longer drifts left when nothing is in the way. The boundary
+  was the conversation column's right edge — and since the chip sits exactly
+  there, centering on the chip always overflowed it and the clamp fired on
+  every hover. The popover now may extend past the column into empty chrome
+  (it floats above the app); the boundary is the **actual docked side
+  panel's** left edge, found by walking the chip's ancestors for a tall
+  right-docked sibling. No panel → dead-centered on the chip, even over the
+  margin; panel open → slides clear of it.
+
 ## [0.10.3] — 2026-10-27
 
 ### Changed
