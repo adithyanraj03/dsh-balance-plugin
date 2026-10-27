@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.8.0] — 2026-10-27
+
+### Added
+
+- **The countdown now lives on the chip itself.** During peak — and in the
+  last hour of off-peak — the pill carries the remaining time beside its
+  status dot (`$11.94 ● 1h 35m`), in quiet tertiary ink with tabular figures
+  so it never jitters as it ticks. It follows the same rules as the tooltip
+  and needs no second clock: the 60s poll repaints it.
+
+### Changed
+
+- The popover header is now a real header: the provider's brand mark, the
+  billing status tinted by window (red peak, green off-peak) in semibold, and
+  the countdown pushed to the right edge in tabular figures. A hairline
+  separates the content from the `Click to refresh` hint, and the panel has a
+  minimum width so the countdown sits on a stable line.
+
 ## [0.7.0] — 2026-10-27
 
 ### Changed

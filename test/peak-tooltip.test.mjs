@@ -72,12 +72,13 @@ function loadTooltip() {
     extractFunction(bundle, 'utcMondayStart'),
     extractFunction(bundle, 'peakWindowsLocalLabel'),
     extractFunction(bundle, 'tooltipLines'),
+    extractFunction(bundle, 'chipTimer'),
   ].join('\n')
   return new Function(`${source}
-    return { nextTransition, formatCountdown, peakWindowsLocalLabel, tooltipLines }`)()
+    return { nextTransition, formatCountdown, peakWindowsLocalLabel, tooltipLines, chipTimer }`)()
 }
 
-const { nextTransition, formatCountdown, peakWindowsLocalLabel, tooltipLines } = loadTooltip()
+const { nextTransition, formatCountdown, peakWindowsLocalLabel, tooltipLines, chipTimer } = loadTooltip()
 
 const deepseekOk = (peak) => ({
   kind: 'ok', provider: 'deepseek', symbol: '$', total: '11.97',
@@ -96,7 +97,9 @@ test('the peak windows read in IST with AM/PM tags and the zone label', () => {
 
 test('peak always counts down to off-peak', () => {
   const lines = tooltipLines(deepseekOk(true), new Date('2026-09-07T02:00:00Z'))
-  assert.match(lines[0].text, /Peak billing — off-peak in 2h/)
+  assert.match(lines[0].text, /Peak billing$/)
+  assert.equal(lines[0].countdown, 'off-peak in 2h')
+  assert.equal(lines[0].peak, true)
   assert.match(lines[1].text, /GMT\+5:30/)
   assert.match(lines[2].text, /Total \$11\.97/)
   assert.equal(lines[3].text, 'Click to refresh')
@@ -104,9 +107,17 @@ test('peak always counts down to off-peak', () => {
 
 test('off-peak counts down to peak only within the last hour', () => {
   const close = tooltipLines(deepseekOk(false), new Date('2026-09-07T05:15:00Z'))
-  assert.match(close[0].text, /Off-peak · 50% price — peak in 45m/)
+  assert.match(close[0].text, /Off-peak · 50% price$/)
+  assert.equal(close[0].countdown, 'peak in 45m')
   const far = tooltipLines(deepseekOk(false), new Date('2026-09-07T20:00:00Z'))
-  assert.ok(!far[0].text.includes('peak in'), `far off-peak stays quiet: ${far[0].text}`)
+  assert.equal(far[0].countdown, undefined)
+})
+
+test('the chip timer mirrors the tooltip countdown', () => {
+  assert.equal(chipTimer(new Date('2026-09-07T02:00:00Z')), '2h')
+  assert.equal(chipTimer(new Date('2026-09-07T05:15:00Z')), '45m')
+  assert.equal(chipTimer(new Date('2026-09-07T20:00:00Z')), undefined)
+  assert.equal(chipTimer(new Date('2026-09-12T12:00:00Z')), undefined)
 })
 
 test('the weekend countdown spans to Monday peak', () => {
@@ -115,7 +126,7 @@ test('the weekend countdown spans to Monday peak', () => {
   assert.equal(at.toISOString(), '2026-09-14T01:00:00.000Z')
   const lines = tooltipLines(deepseekOk(false), new Date('2026-09-12T12:00:00Z'))
   // 61 hours out — well past the 1-hour window, so no countdown.
-  assert.ok(!lines[0].text.includes('peak in'), lines[0].text)
+  assert.equal(lines[0].countdown, undefined)
 })
 
 test('countdown formatting rounds to minutes and drops empty parts', () => {
@@ -139,6 +150,10 @@ test('the tooltip is a styled DSH popover, not a native title', () => {
   assert.match(bundle, /role: "tooltip"/)
   assert.match(bundle, /--dsw-alias-bg-layer-1/)
   assert.match(bundle, /--dsw-alias-border-l2/)
+  // Header countdown and chip timer use fixed-width digits; a hairline
+  // separates the content from the footer hint.
+  assert.match(bundle, /tabular-nums/)
+  assert.match(bundle, /--dsw-alias-border-l1/)
   // The chip elements carry no native title attribute any more.
   assert.doesNotMatch(bundle, /title: `Balance|title: `\$\{state\.title\}|title: "Loading balance/)
 })

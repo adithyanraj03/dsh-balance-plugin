@@ -674,11 +674,15 @@ const dotBaseStyle: CSSProperties = {
 export interface TooltipLine {
   readonly text: string
   readonly muted?: boolean
+  /** DeepSeek heading only: the countdown to the next billing boundary. */
+  readonly countdown?: string
+  /** DeepSeek heading only: which window the hover instant falls in. */
+  readonly peak?: boolean
 }
 
 /**
  * Build the tooltip lines for a display state, evaluated at hover time so the
- * countdown is fresh. DeepSeek gets a status line carrying the countdown to
+ * countdown is fresh. DeepSeek gets a status heading carrying the countdown to
  * the next billing boundary — always during peak ("off-peak in Xh Ym"), and
  * within the last hour of off-peak ("peak in Xh Ym") — followed by the peak
  * windows in the viewer's own system time with AM/PM tags and a zone label.
@@ -701,9 +705,9 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
     const { at, to } = nextTransition(now)
     const ms = at.getTime() - now.getTime()
     const countdown = peak
-      ? ` — off-peak in ${formatCountdown(ms)}`
-      : to === 'peak' && ms <= HOUR_MS ? ` — peak in ${formatCountdown(ms)}` : ''
-    lines.push({ text: `${state.heading} · ${peak ? 'Peak billing' : 'Off-peak · 50% price'}${countdown}` })
+      ? `off-peak in ${formatCountdown(ms)}`
+      : to === 'peak' && ms <= HOUR_MS ? `peak in ${formatCountdown(ms)}` : undefined
+    lines.push({ text: `${state.heading} · ${peak ? 'Peak billing' : 'Off-peak · 50% price'}`, countdown, peak })
     lines.push({ text: peakWindowsLocalLabel(now), muted: true })
   } else {
     lines.push({ text: state.heading })
@@ -713,19 +717,37 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
   return lines
 }
 
+/**
+ * The chip's inline timer: the countdown to the next billing boundary, shown
+ * beside the dot — always during peak, and in the last hour of off-peak.
+ * Undefined otherwise, so quiet off-peak hours and every other provider stay
+ * bare. Minute granularity is the point: the chip repaints on the 60s poll,
+ * which keeps the timer honest without a second clock.
+ * @param now - the render instant (defaults to now).
+ * @returns the countdown text, or undefined when there is nothing to count.
+ */
+export function chipTimer(now: Date = new Date()): string | undefined {
+  const peak = isPeakHour(now)
+  const { at, to } = nextTransition(now)
+  const ms = at.getTime() - now.getTime()
+  if (peak) return formatCountdown(ms)
+  return to === 'peak' && ms <= HOUR_MS ? formatCountdown(ms) : undefined
+}
+
 /** Hover panel in the DSH popover idiom: elevated layer, hairline border, 12px text. */
 const tooltipStyle: CSSProperties = {
   position: 'fixed',
   zIndex: 1000,
   display: 'flex',
   flexDirection: 'column',
-  gap: 3,
+  gap: 4,
+  minWidth: 250,
   maxWidth: 340,
-  padding: '8px 11px',
+  padding: '9px 12px',
   background: 'var(--dsw-alias-bg-layer-1)',
   border: '0.5px solid var(--dsw-alias-border-l2)',
   borderRadius: 'var(--dsw-radius-md)',
-  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.30)',
+  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.32)',
   color: 'var(--dsw-alias-label-primary)',
   fontSize: 12,
   lineHeight: '17px',
@@ -734,24 +756,75 @@ const tooltipStyle: CSSProperties = {
   textAlign: 'left',
 }
 
+/** Hairline separating the tooltip's content from its footer hint. */
+const tooltipDividerStyle: CSSProperties = {
+  height: '0.5px',
+  margin: '3px 0',
+  background: 'var(--dsw-alias-border-l1)',
+}
+
+/** The countdown in the tooltip header: pushed right, fixed-width digits so it never jitters. */
+const tooltipCountdownStyle: CSSProperties = {
+  marginLeft: 'auto',
+  paddingLeft: 14,
+  fontVariantNumeric: 'tabular-nums',
+  fontWeight: 600,
+  color: 'var(--dsw-alias-label-primary)',
+}
+
+/** The timer beside the chip's dot: quiet, tabular, on the same text line. */
+const chipTimerStyle: CSSProperties = {
+  fontSize: 11,
+  color: 'var(--dsw-alias-label-tertiary)',
+  fontVariantNumeric: 'tabular-nums',
+}
+
 /**
  * The chip's hover tooltip: a styled panel in the DSH popover idiom — the
  * native `title` attribute renders as an unstyled OS bubble that reads as a
- * glitch against the app chrome. It is `position: fixed` from the chip's
- * measured rect, so no ancestor's overflow can clip it, and it anchors above
- * the chip, since both seats sit at the bottom of the window.
- * @param props - the lines to show and the chip's viewport rect.
+ * glitch against the app chrome. The header carries the provider mark and,
+ * for DeepSeek, the billing status tinted by window with the countdown on
+ * the right; a hairline separates the content from the footer hint. It is
+ * `position: fixed` from the chip's measured rect, so no ancestor's overflow
+ * can clip it, and it anchors above the chip, since both seats sit at the
+ * bottom of the window.
+ * @param props - the display state to describe and the chip's viewport rect.
  * @returns the tooltip element.
  */
-function ChipTooltip({ lines, rect }: { readonly lines: readonly TooltipLine[]; readonly rect: DOMRect }) {
+function ChipTooltip({ state, rect }: { readonly state: DisplayState; readonly rect: DOMRect }) {
+  const lines = tooltipLines(state)
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - 356))
   return (
     <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6 }}>
-      {lines.map((line, index) => (
-        <span key={index} style={line.muted === true ? { color: 'var(--dsw-alias-label-secondary)' } : undefined}>
-          {line.text}
-        </span>
-      ))}
+      {lines.flatMap((line, index) => {
+        const node = line.countdown !== undefined ? (
+          <span key={index} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {state.kind === 'ok' && <ProviderLogo provider={state.provider} />}
+            <span
+              style={{
+                fontWeight: 600,
+                color: line.peak === true
+                  ? 'var(--dsw-alias-state-error-primary)'
+                  : 'var(--dsw-alias-state-success-primary)',
+              }}
+            >
+              {line.text}
+            </span>
+            <span style={tooltipCountdownStyle}>{line.countdown}</span>
+          </span>
+        ) : (
+          <span key={index} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {index === 0 && state.kind === 'ok' && <ProviderLogo provider={state.provider} />}
+            <span style={line.muted === true ? { color: 'var(--dsw-alias-label-secondary)' } : undefined}>
+              {line.text}
+            </span>
+          </span>
+        )
+        // A hairline before the footer line separates content from the hint.
+        return index === lines.length - 1 && lines.length > 1
+          ? [<div key={`divider-${index}`} style={tooltipDividerStyle} />, node]
+          : [node]
+      })}
     </div>
   )
 }
@@ -967,6 +1040,10 @@ export function BalanceChip({
   }, [])
   const hideTip = useCallback(() => { setTipRect(null) }, [])
 
+  // The DeepSeek billing countdown, evaluated on every render (the 60s poll
+  // repaints it). Undefined for every other provider and quiet off-peak.
+  const timer = state.kind === 'ok' && state.provider === 'deepseek' ? chipTimer() : undefined
+
   return (
     <div ref={anchorRef}>
       {state.kind === 'loading' ? (
@@ -1010,9 +1087,14 @@ export function BalanceChip({
               account label's sake. */}
           <span style={amountStyle}>{state.symbol}{state.total}</span>
           <span role="img" aria-label={state.detail} style={{ ...dotBaseStyle, background: state.dotColor }} />
+          {/* DeepSeek carries its billing countdown right on the strip, next to
+              the dot — the tooltip explains it, the timer just ticks. */}
+          {state.provider === 'deepseek' && timer !== undefined && (
+            <span style={chipTimerStyle}>{timer}</span>
+          )}
         </button>
       )}
-      {tipRect !== null && <ChipTooltip lines={tooltipLines(state)} rect={tipRect} />}
+      {tipRect !== null && <ChipTooltip state={state} rect={tipRect} />}
     </div>
   )
 }
