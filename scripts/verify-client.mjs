@@ -74,6 +74,40 @@ for (const [iso, expected, label] of peakCases) {
 }
 console.log(`peak-hour assertions: PASS (${peakCases.length} cases, incl. weekend off-peak)`)
 
+// nextTransition: the boundary scan must agree with the peak windows.
+if (typeof mod.nextTransition !== 'function') throw new Error('nextTransition missing')
+const transitionCases = [
+  ['2026-09-07T02:00:00Z', '2026-09-07T04:00:00.000Z', 'off', 'Monday 02:00 UTC (peak) → 04:00 off-peak'],
+  ['2026-09-07T05:00:00Z', '2026-09-07T06:00:00.000Z', 'peak', 'Monday 05:00 UTC (gap) → 06:00 peak'],
+  ['2026-09-07T11:00:00Z', '2026-09-08T01:00:00.000Z', 'peak', 'Monday 11:00 UTC → Tuesday 01:00 peak'],
+  ['2026-09-11T10:30:00Z', '2026-09-14T01:00:00.000Z', 'peak', 'Friday 10:30 UTC → Monday 01:00 peak (weekend)'],
+  ['2026-09-12T12:00:00Z', '2026-09-14T01:00:00.000Z', 'peak', 'Saturday noon → Monday 01:00 peak'],
+  ['2026-09-07T04:00:00Z', '2026-09-07T06:00:00.000Z', 'peak', 'exactly at 04:00 → next edge is 06:00 peak'],
+]
+for (const [iso, wantAt, wantTo, label] of transitionCases) {
+  const got = mod.nextTransition(new Date(iso))
+  if (got.at.toISOString() !== wantAt || got.to !== wantTo) throw new Error(`transition mismatch for ${label}: got ${got.at.toISOString()} ${got.to}`)
+}
+console.log(`next-transition assertions: PASS (${transitionCases.length} cases)`)
+
+// Countdown formatting and the tooltip's line structure.
+if (mod.formatCountdown(4_500_000) !== '1h 15m') throw new Error('countdown h+m')
+if (mod.formatCountdown(2 * 3_600_000) !== '2h') throw new Error('countdown h')
+if (mod.formatCountdown(45 * 60_000) !== '45m') throw new Error('countdown m')
+if (mod.formatCountdown(30_000) !== '1m') throw new Error('countdown 30s rounds to 1m')
+if (mod.formatCountdown(20_000) !== 'under 1m') throw new Error('countdown under 1m')
+const deepseekOk = (peak) => ({ kind: 'ok', provider: 'deepseek', symbol: '$', total: '11.97', heading: 'DeepSeek', detail: 'Total $11.97 · Granted $0.00 · Topped up $11.97', peak })
+const peakTip = mod.tooltipLines(deepseekOk(true), new Date('2026-09-07T02:00:00Z'))
+if (!peakTip[0].text.includes('Peak billing') || !peakTip[0].text.includes('off-peak in 2h')) throw new Error(`peak tooltip: ${peakTip[0].text}`)
+if (!/Peak .*\d/.test(peakTip[1].text) || !/\(GMT|UTC\)/.test(peakTip[1].text)) throw new Error(`window label: ${peakTip[1].text}`)
+const offTip = mod.tooltipLines(deepseekOk(false), new Date('2026-09-07T05:15:00Z'))
+if (!offTip[0].text.includes('Off-peak') || !offTip[0].text.includes('peak in 45m')) throw new Error(`off-peak tooltip: ${offTip[0].text}`)
+const farTip = mod.tooltipLines(deepseekOk(false), new Date('2026-09-07T20:00:00Z'))
+if (farTip[0].text.includes('peak in')) throw new Error(`far off-peak must not count down: ${farTip[0].text}`)
+const orTip = mod.tooltipLines({ kind: 'ok', provider: 'openrouter', symbol: '$', total: '9.74', heading: 'OpenRouter', detail: 'Remaining $9.74' }, new Date('2026-09-07T02:00:00Z'))
+if (orTip[0].text !== 'OpenRouter' || orTip.some((line) => line.text.includes('Peak'))) throw new Error('openrouter tooltip must stay plain')
+console.log('tooltip assertions: PASS (peak countdown, off-peak 1h window, local windows, plain providers)')
+
 // Apply with a fake slot registry and a fake plugin scope exposing the optional
 // model-directory service lazily (the real service registers after this plugin).
 const injected = []

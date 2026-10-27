@@ -64,7 +64,7 @@ On DeepSeek the chip also tracks **peak / off-peak billing** — the status dot 
 - **One chip, five providers.** DeepSeek, OpenRouter, Moonshot/Kimi, Zhipu/GLM (Z.ai), and MiniMax — each with its own brand mark, currency, and tooltip breakdown.
 - **On the hero too.** A blank session shows the chip in the composer tool row beside the model selector; the first send flies it down to the dock strip.
 - **Provider-aware.** Switching the active model switches the chip to that provider's balance immediately.
-- **Peak/off-peak aware on DeepSeek.** The status dot turns red during DeepSeek's peak billing window (Monday–Friday, Beijing 09:00–12:00 and 14:00–18:00) and green off-peak, when requests cost half price.
+- **Peak/off-peak aware on DeepSeek.** The status dot turns red during DeepSeek's peak billing window (Monday–Friday, Beijing 09:00–12:00 and 14:00–18:00) and green off-peak, when requests cost half price. The hover shows those windows converted to your system time with AM/PM tags, plus a live countdown — `off-peak in 1h 20m` during peak, `peak in 45m` in the last hour of off-peak. See [DeepSeek peak / off-peak hours](#deepseek-peak--off-peak-hours).
 - **Your key never reaches the browser.** The host half resolves the credential and calls the provider; the browser only ever sees a normalized balance.
 - **Live.** Auto-refreshes every 60 seconds, on click, when the session changes, and the moment the model's provider changes.
 - **Graceful.** A missing key or an upstream error becomes a muted `Balance —` pill with the reason in the tooltip — never a broken layout.
@@ -109,7 +109,7 @@ The mapping is deliberately narrow: a route the plugin does not recognize (inclu
 
 - **`[brand mark] $9.74 ●`** — the provider's logo, the amount, then a status dot.
 - **Status dot** — DeepSeek marks its peak/off-peak billing window (green = off-peak, red = peak; see [DeepSeek peak / off-peak hours](#deepseek-peak--off-peak-hours)). OpenRouter, Moonshot, Zhipu, and MiniMax mark a positive remaining balance or quota (green = left, red = exhausted).
-- **Tooltip** — the full breakdown (for example `Total $42.50 · Granted $5.00 · Topped up $37.50`).
+- **Tooltip** — a styled popover with the full breakdown (for example `Total $42.50 · Granted $5.00 · Topped up $37.50`), the peak windows in your own system time with AM/PM tags, and a countdown to the next billing boundary.
 - **Click** — refresh now.
 - **Errors** — a muted `Balance —` pill; hover for the reason, click to retry.
 - **Compact by design** — the chip is a slim pill on the same text line as the activity, usage and context pills, and it takes exactly the width its own content needs. The chip never gives up its amount.

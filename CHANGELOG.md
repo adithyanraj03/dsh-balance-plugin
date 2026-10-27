@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.7.0] — 2026-10-27
+
+### Changed
+
+- The hover is now a **styled popover in the DSH idiom** (elevated layer,
+  hairline border, theme-aware tokens) instead of the unstyled native `title`
+  bubble. It floats `position: fixed` above the chip so no ancestor clips it,
+  and carries structured lines: heading, breakdown, and a refresh hint.
+- The DeepSeek peak windows are described in **your system time with AM/PM
+  tags and a zone label** — e.g. `Peak Mon–Fri 6:30 AM – 9:30 AM & 11:30 AM –
+  3:30 PM (GMT+5:30)` — replacing the Beijing/UTC text. The weekday range and
+  clock times are derived from the fixed UTC windows through the viewer's own
+  timezone, so negative offsets correctly see them start on Sunday evenings.
+
+### Added
+
+- **Countdown to the next billing boundary**, evaluated fresh on every hover:
+  during peak the tooltip always shows `off-peak in 1h 20m`; during off-peak
+  it shows `peak in 45m` within the last hour before peak starts.
+
 ## [0.6.0] — 2026-10-26
 
 ### Added

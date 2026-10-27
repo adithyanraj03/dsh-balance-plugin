@@ -126,7 +126,19 @@ interface BalanceResponse {
 /** The rendered result of one refresh, fully shaped for the chip. */
 type DisplayState =
   | { kind: 'loading' }
-  | { kind: 'ok'; provider: BalanceKind; symbol: string; total: string; title: string; dotColor: CSSProperties['background'] }
+  | {
+      kind: 'ok'
+      provider: BalanceKind
+      symbol: string
+      total: string
+      /** Tooltip heading: the provider (or plan) the amount belongs to. */
+      heading: string
+      /** Tooltip body: the provider's own breakdown line. */
+      detail: string
+      /** DeepSeek only: whether the fetch landed inside a peak billing window. */
+      peak?: boolean
+      dotColor: CSSProperties['background']
+    }
   | { kind: 'error'; message: string }
 
 /**
@@ -261,6 +273,106 @@ export function isPeakHour(now: Date = new Date()): boolean {
   return (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10)
 }
 
+/** The two daily peak windows as UTC hour ranges `[start, end)`, weekdays only. */
+const PEAK_WINDOWS_UTC: readonly (readonly [number, number])[] = [[1, 4], [6, 10]]
+
+const HOUR_MS = 3_600_000
+const DAY_MS = 86_400_000
+
+/**
+ * The next peak/off-peak boundary strictly after `now`, with the state it
+ * leads into. Weekday windows repeat weekly, so a boundary always exists
+ * within seven days; the scan walks day by day and checks each window's
+ * edges in chronological order.
+ * @param now - the instant to search from (defaults to now).
+ * @returns the boundary instant and whether it starts (`'peak'`) or ends
+ *   (`'off'`) a peak window.
+ */
+export function nextTransition(now: Date = new Date()): { readonly at: Date; readonly to: 'peak' | 'off' } {
+  const t0 = now.getTime()
+  for (let dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+    const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + dayOffset)
+    const day = new Date(dayStart).getUTCDay()
+    if (day === 0 || day === 6) continue
+    for (const [start, end] of PEAK_WINDOWS_UTC) {
+      const startAt = dayStart + start * HOUR_MS
+      if (startAt > t0) return { at: new Date(startAt), to: 'peak' }
+      const endAt = dayStart + end * HOUR_MS
+      if (endAt > t0) return { at: new Date(endAt), to: 'off' }
+    }
+  }
+  return { at: new Date(t0), to: 'off' } // unreachable: a weekday edge is always within 7 days
+}
+
+/**
+ * Render a duration as a short countdown, e.g. `1h 20m`, `45m`, `2h` or
+ * `under 1m`. Minutes are rounded, so the tooltip never shows `0m` for a
+ * round hour or a just-started minute.
+ * @param ms - milliseconds remaining.
+ * @returns the countdown text.
+ */
+export function formatCountdown(ms: number): string {
+  const totalMinutes = Math.max(0, Math.round(ms / 60_000))
+  if (totalMinutes < 1) return 'under 1m'
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours === 0) return `${minutes}m`
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`
+}
+
+/** Format an instant in the viewer's system timezone with AM/PM tags. */
+function localClock(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }).format(date)
+}
+
+/** The short English weekday (`Mon`) of an instant in the viewer's timezone. */
+function localWeekday(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date)
+}
+
+/** The viewer's timezone as a short offset label, e.g. `GMT+5:30`. */
+function localZoneLabel(): string {
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: 'shortOffset' }).formatToParts(new Date())
+    const zone = parts.find((part) => part.type === 'timeZoneName')?.value
+    if (zone !== undefined && zone.length > 0) return zone
+  } catch { /* older Intl: fall through to the manual offset */ }
+  const offset = -new Date().getTimezoneOffset()
+  const sign = offset < 0 ? '-' : '+'
+  const abs = Math.abs(offset)
+  return `GMT${sign}${Math.floor(abs / 60)}${abs % 60 === 0 ? '' : `:${String(abs % 60).padStart(2, '0')}`}`
+}
+
+/** Midnight UTC of the Monday of the week containing `now`. */
+function utcMondayStart(now: Date): number {
+  const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  return dayStart - ((now.getUTCDay() + 6) % 7) * DAY_MS
+}
+
+/**
+ * The peak windows described in the viewer's own system time with AM/PM tags
+ * and a zone label — e.g. `Peak Mon–Fri 6:30 AM – 9:30 AM & 11:30 AM – 3:30 PM
+ * (GMT+5:30)`. The windows are fixed UTC intervals, so their local clock times
+ * repeat every weekday; a representative Monday of the current week is used,
+ * which keeps DST-shifted zones honest. The weekday range spans the local
+ * weekdays the windows actually touch (negative offsets see them start on
+ * Sunday evenings).
+ * @param now - the week to describe (defaults to now).
+ * @returns the local-time window label.
+ */
+export function peakWindowsLocalLabel(now: Date = new Date()): string {
+  const monday = utcMondayStart(now)
+  const at = (dayOffset: number, hour: number) => new Date(monday + dayOffset * DAY_MS + hour * HOUR_MS)
+  const firstStart = at(0, 1)
+  const lastEnd = at(4, 10)
+  const firstDay = localWeekday(firstStart)
+  const lastDay = localWeekday(lastEnd)
+  const days = firstDay === lastDay ? firstDay : `${firstDay}–${lastDay}`
+  const window1 = `${localClock(at(0, 1))} – ${localClock(at(0, 4))}`
+  const window2 = `${localClock(at(0, 6))} – ${localClock(at(0, 10))}`
+  return `Peak ${days} ${window1} & ${window2} (${localZoneLabel()})`
+}
+
 /**
  * Shape the OpenRouter response into the chip display state. The host serves
  * `total_credits`/`total_usage` (from `/api/v1/credits`), whose difference is
@@ -280,7 +392,8 @@ function renderOpenRouter(data: BalanceResponse): DisplayState {
     provider: 'openrouter',
     symbol: '$',
     total,
-    title: `OpenRouter · remaining $${total}`,
+    heading: 'OpenRouter',
+    detail: `Remaining $${total}`,
     dotColor: remaining > 0
       ? 'var(--dsw-alias-state-success-primary)'
       : 'var(--dsw-alias-state-error-primary)',
@@ -294,15 +407,14 @@ function renderDeepSeek(data: BalanceResponse): DisplayState {
   const symbol = currencySymbol(info.currency)
   const breakdown = `Total ${symbol}${info.total_balance} · Granted ${symbol}${info.granted_balance} · Topped up ${symbol}${info.topped_up_balance}`
   const peak = isPeakHour()
-  const windowLabel = peak
-    ? 'Peak · Mon–Fri 09:00–12:00, 14:00–18:00 Beijing (01:00–04:00, 06:00–10:00 UTC)'
-    : 'Off-peak · 50% of the peak price'
   return {
     kind: 'ok',
     provider: 'deepseek',
     symbol,
     total: info.total_balance,
-    title: `${windowLabel} · ${breakdown}`,
+    heading: 'DeepSeek',
+    detail: breakdown,
+    peak,
     dotColor: peak
       ? 'var(--dsw-alias-state-error-primary)'
       : 'var(--dsw-alias-state-success-primary)',
@@ -329,7 +441,8 @@ function renderMoonshot(data: BalanceResponse): DisplayState {
     provider: 'moonshot',
     symbol: '$',
     total,
-    title: `Moonshot · ${breakdown}`,
+    heading: 'Moonshot',
+    detail: breakdown,
     dotColor: available > 0
       ? 'var(--dsw-alias-state-success-primary)'
       : 'var(--dsw-alias-state-error-primary)',
@@ -371,7 +484,8 @@ function renderZhipu(data: BalanceResponse): DisplayState {
     provider: 'zhipu',
     symbol,
     total,
-    title: `Zhipu · remaining ${symbol}${total}`,
+    heading: 'Zhipu',
+    detail: `Remaining ${symbol}${total}`,
     dotColor: remaining > 0
       ? 'var(--dsw-alias-state-success-primary)'
       : 'var(--dsw-alias-state-error-primary)',
@@ -408,7 +522,10 @@ function renderMiniMax(data: BalanceResponse): DisplayState {
       provider: 'minimax',
       symbol: '',
       total: label,
-      title: `${plan} · ${remainingCount} remaining`,
+      heading: plan,
+      detail: remainingPercent !== undefined
+        ? `${remainingCount} prompts remaining (${remainingPercent}%)`
+        : `${remainingCount} prompts remaining`,
       dotColor: remainingCount > 0
         ? 'var(--dsw-alias-state-success-primary)'
         : 'var(--dsw-alias-state-error-primary)',
@@ -420,7 +537,8 @@ function renderMiniMax(data: BalanceResponse): DisplayState {
       provider: 'minimax',
       symbol: '',
       total: `${remainingPercent}%`,
-      title: `${plan} · ${remainingPercent}% remaining`,
+      heading: plan,
+      detail: `${remainingPercent}% remaining`,
       dotColor: remainingPercent > 0
         ? 'var(--dsw-alias-state-success-primary)'
         : 'var(--dsw-alias-state-error-primary)',
@@ -552,6 +670,92 @@ const dotBaseStyle: CSSProperties = {
   borderRadius: '50%',
 }
 
+/** One line of the hover tooltip; muted lines render in the secondary label tone. */
+export interface TooltipLine {
+  readonly text: string
+  readonly muted?: boolean
+}
+
+/**
+ * Build the tooltip lines for a display state, evaluated at hover time so the
+ * countdown is fresh. DeepSeek gets a status line carrying the countdown to
+ * the next billing boundary — always during peak ("off-peak in Xh Ym"), and
+ * within the last hour of off-peak ("peak in Xh Ym") — followed by the peak
+ * windows in the viewer's own system time with AM/PM tags and a zone label.
+ * @param state - the current display state.
+ * @param now - the hover instant (defaults to now).
+ * @returns the tooltip's lines, heading first.
+ */
+export function tooltipLines(state: DisplayState, now: Date = new Date()): TooltipLine[] {
+  if (state.kind === 'loading') return [{ text: 'Loading balance…' }]
+  if (state.kind === 'error') {
+    return [
+      { text: 'Balance unavailable' },
+      { text: state.message, muted: true },
+      { text: 'Click to retry', muted: true },
+    ]
+  }
+  const lines: TooltipLine[] = []
+  if (state.provider === 'deepseek') {
+    const peak = isPeakHour(now)
+    const { at, to } = nextTransition(now)
+    const ms = at.getTime() - now.getTime()
+    const countdown = peak
+      ? ` — off-peak in ${formatCountdown(ms)}`
+      : to === 'peak' && ms <= HOUR_MS ? ` — peak in ${formatCountdown(ms)}` : ''
+    lines.push({ text: `${state.heading} · ${peak ? 'Peak billing' : 'Off-peak · 50% price'}${countdown}` })
+    lines.push({ text: peakWindowsLocalLabel(now), muted: true })
+  } else {
+    lines.push({ text: state.heading })
+  }
+  lines.push({ text: state.detail })
+  lines.push({ text: 'Click to refresh', muted: true })
+  return lines
+}
+
+/** Hover panel in the DSH popover idiom: elevated layer, hairline border, 12px text. */
+const tooltipStyle: CSSProperties = {
+  position: 'fixed',
+  zIndex: 1000,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 3,
+  maxWidth: 340,
+  padding: '8px 11px',
+  background: 'var(--dsw-alias-bg-layer-1)',
+  border: '0.5px solid var(--dsw-alias-border-l2)',
+  borderRadius: 'var(--dsw-radius-md)',
+  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.30)',
+  color: 'var(--dsw-alias-label-primary)',
+  fontSize: 12,
+  lineHeight: '17px',
+  whiteSpace: 'normal',
+  pointerEvents: 'none',
+  textAlign: 'left',
+}
+
+/**
+ * The chip's hover tooltip: a styled panel in the DSH popover idiom — the
+ * native `title` attribute renders as an unstyled OS bubble that reads as a
+ * glitch against the app chrome. It is `position: fixed` from the chip's
+ * measured rect, so no ancestor's overflow can clip it, and it anchors above
+ * the chip, since both seats sit at the bottom of the window.
+ * @param props - the lines to show and the chip's viewport rect.
+ * @returns the tooltip element.
+ */
+function ChipTooltip({ lines, rect }: { readonly lines: readonly TooltipLine[]; readonly rect: DOMRect }) {
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - 356))
+  return (
+    <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6 }}>
+      {lines.map((line, index) => (
+        <span key={index} style={line.muted === true ? { color: 'var(--dsw-alias-label-secondary)' } : undefined}>
+          {line.text}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 /** An element the dock pin styled, with the `order` value to restore on unmount. */
 export interface DockPin {
   readonly element: HTMLElement
@@ -658,6 +862,7 @@ export function BalanceChip({
 }) {
   const [state, setState] = useState<DisplayState>({ kind: 'loading' })
   const anchorRef = useRef<HTMLDivElement>(null)
+  const [tipRect, setTipRect] = useState<DOMRect | null>(null)
   const activeSession = useSessions(
     (snapshot) => currentSessionId(snapshot as unknown as SessionsSnapshotLike),
   )
@@ -754,25 +959,60 @@ export function BalanceChip({
   // over, and this one's remembered position becomes its flight's origin.
   if (variant === 'hero' && !blank) return null
 
+  // The tooltip measures the chip on show, so it can float `position: fixed`
+  // above the seat without being clipped by ancestor overflow.
+  const showTip = useCallback(() => {
+    const anchor = anchorRef.current
+    if (anchor !== null) setTipRect(anchor.getBoundingClientRect())
+  }, [])
+  const hideTip = useCallback(() => { setTipRect(null) }, [])
+
   return (
     <div ref={anchorRef}>
       {state.kind === 'loading' ? (
-        <div style={chipStyle} title="Loading balance…" aria-busy="true">
+        <div
+          style={chipStyle}
+          aria-busy="true"
+          aria-label="Loading balance"
+          onMouseEnter={showTip}
+          onMouseLeave={hideTip}
+          onFocus={showTip}
+          onBlur={hideTip}
+        >
           <span style={amountStyle}>Loading…</span>
         </div>
       ) : state.kind === 'error' ? (
-        <button type="button" style={chipStyle} title={`Balance unavailable — ${state.message} (click to retry)`} onClick={() => { void refresh() }}>
+        <button
+          type="button"
+          style={chipStyle}
+          aria-label={`Balance unavailable — ${state.message}`}
+          onMouseEnter={showTip}
+          onMouseLeave={hideTip}
+          onFocus={showTip}
+          onBlur={hideTip}
+          onClick={() => { void refresh() }}
+        >
           <span style={amountStyle}>Balance —</span>
         </button>
       ) : (
-        <button type="button" style={chipStyle} title={`${state.title} (click to refresh)`} onClick={() => { void refresh() }}>
+        <button
+          type="button"
+          style={chipStyle}
+          aria-label={`${state.heading} ${state.symbol}${state.total}`}
+          onMouseEnter={showTip}
+          onMouseLeave={hideTip}
+          onFocus={showTip}
+          onBlur={hideTip}
+          onClick={() => { void refresh() }}
+        >
           <ProviderLogo provider={state.provider} />
           {/* The amount is the point of the chip, so it is never dropped for the
               account label's sake. */}
           <span style={amountStyle}>{state.symbol}{state.total}</span>
-          <span role="img" aria-label={state.title} style={{ ...dotBaseStyle, background: state.dotColor }} />
+          <span role="img" aria-label={state.detail} style={{ ...dotBaseStyle, background: state.dotColor }} />
         </button>
       )}
+      {tipRect !== null && <ChipTooltip lines={tooltipLines(state)} rect={tipRect} />}
     </div>
   )
 }
