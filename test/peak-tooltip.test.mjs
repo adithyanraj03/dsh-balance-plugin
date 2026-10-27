@@ -182,12 +182,14 @@ test('the tooltip is a styled DSH popover, not a native title', () => {
   assert.match(bundle, /@keyframes dsh-balance-clock-pop/)
   assert.match(bundle, /stroke: "currentColor"/)
   // The popover centers on the chip (icon as pivot) and may extend past the
-  // conversation column into empty chrome; only a docked side panel — found
-  // by walking for a tall right-docked sibling — bounds it, and the slide is
+  // conversation column into empty chrome; only a real side panel bounds it
+  // — one that displaces the column or floats over it (fixed/absolute), not
+  // the static message list that merely spans the width — and the slide is
   // animated.
   assert.match(bundle, /rect\.width \/ 2/)
   assert.match(bundle, /function popoverBoundary/)
-  assert.match(bundle, /r\.left - 8/)
+  assert.match(bundle, /getComputedStyle\(sibling\)\.position/)
+  assert.match(bundle, /own\.right - 1/)
   assert.match(bundle, /left 220ms/)
   // The chip elements carry no native title attribute any more.
   assert.doesNotMatch(bundle, /title: `Balance|title: `\$\{state\.title\}|title: "Loading balance/)

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.6] — 2026-10-27
+
+### Fixed
+
+- The popover stopped flying to the far left with nothing open. The relaxed
+  panel test matched the **message list itself** — with no panel, the
+  conversation column spans the full window, so the list is "docked right,
+  tall and wide", and its left edge (the sidebar's edge) became the boundary.
+  A candidate now counts only when it displaces the column (starts at its
+  right edge) or floats over it (`fixed`/`absolute`/`sticky` starting inside
+  the column); static flow that merely spans the width passes.
+
 ## [0.10.5] — 2026-10-27
 
 ### Fixed

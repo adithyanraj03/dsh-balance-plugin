@@ -805,12 +805,13 @@ export function chipTimer(now: Date = new Date()): ChipTimer | undefined {
  * the app, so it can extend past the conversation column into empty chrome —
  * the chip sits at the column's right edge, so clamping to the column would
  * push every popover left. What it must not do is hide under a side panel.
- * So: walk from the chip's laid-out row up through every ancestor (body
- * included — panels often portal to the top level) and collect any sibling
- * docked to the window's right edge that is tall and wide enough to be a
- * panel. Panels may displace the column or overlay it, so the test is the
- * dock, not where the column ends; the nearest such left edge wins. With no
- * panel anywhere, the window edge is.
+ * panel. Panels may displace the column or overlay it, so a sibling counts
+ * only when it starts at/after the column's right edge (displacing) or is a
+ * floating (fixed/absolute/sticky) element starting inside it (overlaying) —
+ * the conversation's own static flow, like the message list spanning the
+ * full width, must not read as a panel. The walk continues through body
+ * (panels often portal to the top level) and the nearest left edge wins.
+ * With no panel anywhere, the window edge is.
  * @param anchor - the chip's own element.
  * @returns the x the popover's right edge must stay left of.
  */
@@ -822,13 +823,17 @@ export function popoverBoundary(anchor: HTMLElement): number {
   while (node !== null) {
     const parent: HTMLElement | null = node.parentElement
     if (parent === null) break
+    const own = node.getBoundingClientRect()
     for (const sibling of Array.from(parent.children)) {
       if (sibling === node) continue
       const r = sibling.getBoundingClientRect()
-      // Docked to the window's right edge, tall and wide: a side panel,
-      // whether it displaces the column or overlays it. Left rails and
-      // toolbars do not reach the right edge and pass.
-      if (r.right >= window.innerWidth - 2 && r.height > 200 && r.width > 100) {
+      // Docked to the window's right edge, tall and wide: a candidate panel.
+      if (r.right < window.innerWidth - 2 || r.height <= 200 || r.width <= 100) continue
+      const position = getComputedStyle(sibling).position
+      const floating = position === 'fixed' || position === 'absolute' || position === 'sticky'
+      // Displacing (starts where the column ends) or overlaying (floats over
+      // its middle). Static flow that merely spans the width is not a panel.
+      if (r.left >= own.right - 1 || (floating && r.left > own.left + 8)) {
         boundary = Math.min(boundary, r.left - 8)
       }
     }
