@@ -1,6 +1,6 @@
 {
   "name": "@andrecgoncalves/dsh-balance",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "description": "Provider-aware account balance chip for the DeepSeek Harness composer dock status strip: DeepSeek, OpenRouter, Moonshot/Kimi, Zhipu/GLM, and MiniMax.",
   "license": "MIT",
   "author": {

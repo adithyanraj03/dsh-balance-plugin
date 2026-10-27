@@ -804,32 +804,37 @@ export function chipTimer(now: Date = new Date()): ChipTimer | undefined {
  * The right edge the popover may occupy. It floats `position: fixed` above
  * the app, so it can extend past the conversation column into empty chrome —
  * the chip sits at the column's right edge, so clamping to the column would
- * push every popover left. What it must not do is hide under a docked side
- * panel. So: walk from the chip's laid-out row up through its ancestors and
- * look for a tall sibling that starts where the column ends and reaches the
- * window edge — that is the panel, and its left edge is the boundary. With
- * no panel docked, the window edge is.
+ * push every popover left. What it must not do is hide under a side panel.
+ * So: walk from the chip's laid-out row up through every ancestor (body
+ * included — panels often portal to the top level) and collect any sibling
+ * docked to the window's right edge that is tall and wide enough to be a
+ * panel. Panels may displace the column or overlay it, so the test is the
+ * dock, not where the column ends; the nearest such left edge wins. With no
+ * panel anywhere, the window edge is.
  * @param anchor - the chip's own element.
  * @returns the x the popover's right edge must stay left of.
  */
 export function popoverBoundary(anchor: HTMLElement): number {
   const windowRight = window.innerWidth - 8
   const slot = anchor.closest<HTMLElement>('[data-slot]')
+  let boundary = windowRight
   let node: HTMLElement | null = slot?.parentElement ?? anchor.parentElement
-  while (node !== null && node.parentElement !== null && node.parentElement !== document.body) {
-    const own = node.getBoundingClientRect()
-    for (const sibling of Array.from(node.parentElement.children)) {
+  while (node !== null) {
+    const parent: HTMLElement | null = node.parentElement
+    if (parent === null) break
+    for (const sibling of Array.from(parent.children)) {
       if (sibling === node) continue
       const r = sibling.getBoundingClientRect()
-      // Right-docked, tall, and starting at/after the column's right edge:
-      // the side panel. Left rails and toolbars start before it and pass.
-      if (r.left >= own.right - 1 && r.right >= window.innerWidth - 2 && r.height > 200 && r.width > 100) {
-        return Math.max(208, Math.min(windowRight, r.left - 8))
+      // Docked to the window's right edge, tall and wide: a side panel,
+      // whether it displaces the column or overlays it. Left rails and
+      // toolbars do not reach the right edge and pass.
+      if (r.right >= window.innerWidth - 2 && r.height > 200 && r.width > 100) {
+        boundary = Math.min(boundary, r.left - 8)
       }
     }
-    node = node.parentElement
+    node = parent
   }
-  return windowRight
+  return Math.max(208, boundary)
 }
 
 /** Hover panel in the DSH popover idiom: elevated layer, hairline border, 12px text. */

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.5] — 2026-10-27
+
+### Fixed
+
+- Overlay side panels are now detected too. The walk required the panel to
+  start where the column ends — true only for panels that displace the
+  column — so an overlay panel (floating over the conversation, column
+  unchanged) went unnoticed and the popover hid under it. The test is now
+  simply "docked to the window's right edge, tall and wide", the walk
+  continues through body (portal panels included), and the nearest matching
+  left edge wins.
+
 ## [0.10.4] — 2026-10-27
 
 ### Fixed
