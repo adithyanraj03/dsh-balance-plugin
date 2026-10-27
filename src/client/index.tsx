@@ -913,14 +913,20 @@ function ClockGlyph() {
  * colors in its final five minutes. The breakdown's first segment is
  * emphasized, and a hairline separates the content from the footer hint. It
  * is `position: fixed` from the chip's measured rect, so no ancestor's
- * overflow can clip it, and it anchors above the chip, since both seats sit
- * at the bottom of the window.
+ * overflow can clip it. It anchors ABOVE the chip (both seats sit low in the
+ * window) and hangs to the LEFT of it — the chip sits at the right end of
+ * its strip, so a right-anchored panel stays inside the conversation column
+ * even when a side panel is docked on the right, which would cover a
+ * left-anchored one. Its width is capped to the space left of the chip.
  * @param props - the display state to describe and the chip's viewport rect.
  * @returns the tooltip element.
  */
 function ChipTooltip({ state, rect }: { readonly state: DisplayState; readonly rect: DOMRect }) {
   const lines = tooltipLines(state)
-  const left = Math.max(8, Math.min(rect.left, window.innerWidth - 356))
+  // Right-anchor to the chip and cap the width to the room left of it, so a
+  // docked side panel (or a narrow window) can never cover the popover.
+  const right = Math.max(8, window.innerWidth - rect.right)
+  const maxWidth = Math.max(200, Math.min(340, rect.right - 8))
   const peakInk = 'var(--dsw-alias-state-error-primary)'
   const offInk = 'var(--dsw-alias-state-success-primary)'
   const accent = state.kind !== 'ok'
@@ -929,7 +935,7 @@ function ChipTooltip({ state, rect }: { readonly state: DisplayState; readonly r
       ? (isPeakHour() ? peakInk : offInk)
       : 'var(--dsw-alias-state-business-primary)'
   return (
-    <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6, borderLeft: `3px solid ${accent}` }}>
+    <div role="tooltip" style={{ ...tooltipStyle, right, bottom: window.innerHeight - rect.top + 6, maxWidth, minWidth: Math.min(250, maxWidth), borderLeft: `3px solid ${accent}` }}>
       {lines.flatMap((line, index) => {
         const isFooter = index === lines.length - 1
         const node = line.countdown !== undefined ? (

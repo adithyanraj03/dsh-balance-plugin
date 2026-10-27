@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.1] — 2026-10-27
+
+### Fixed
+
+- The popover no longer slides under a docked side panel. It right-anchors to
+  the chip — hanging leftward into the conversation column, where the chip
+  always sits at the right end — and caps its width to the space left of the
+  chip, so a narrow window can't push it off-screen either.
+
 ## [0.10.0] — 2026-10-27
 
 ### Changed

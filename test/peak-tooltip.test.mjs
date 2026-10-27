@@ -181,6 +181,10 @@ test('the tooltip is a styled DSH popover, not a native title', () => {
   assert.match(bundle, /@keyframes dsh-balance-clock\{/)
   assert.match(bundle, /@keyframes dsh-balance-clock-pop/)
   assert.match(bundle, /stroke: "currentColor"/)
+  // The popover right-anchors to the chip so a docked side panel cannot
+  // cover it, and caps its width to the room left of the chip.
+  assert.match(bundle, /innerWidth - rect\.right/)
+  assert.match(bundle, /rect\.right - 8/)
   // The chip elements carry no native title attribute any more.
   assert.doesNotMatch(bundle, /title: `Balance|title: `\$\{state\.title\}|title: "Loading balance/)
 })
