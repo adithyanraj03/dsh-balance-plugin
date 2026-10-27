@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.9.0] — 2026-10-27
+
+### Changed
+
+- **Countdown ink now reads as relief or warning**: green while the peak
+  window drains (`off-peak in 1h 35m`), red while it approaches through the
+  last hour of off-peak (`peak in 45m`) — on both the chip timer and the
+  popover.
+- The popover got more color: a 3px accent bar on its left edge carries the
+  billing state (red peak, green off-peak, business blue for other providers,
+  amber for errors), the status word sits in a tinted pill (`color-mix`
+  wash of the state color), and the breakdown's first segment — the total —
+  is emphasized while the granted/topped-up parts recede.
+
+### Added
+
+- **Sub-5-minute wave**: when the countdown reaches its final five minutes,
+  both the chip timer and the popover countdown cycle their ink through
+  green → amber → red (`@keyframes dsh-balance-wave`, injected once per
+  document), and stand still under `prefers-reduced-motion`.
+
 ## [0.8.0] — 2026-10-27
 
 ### Added

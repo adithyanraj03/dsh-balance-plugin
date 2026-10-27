@@ -678,6 +678,36 @@ export interface TooltipLine {
   readonly countdown?: string
   /** DeepSeek heading only: which window the hover instant falls in. */
   readonly peak?: boolean
+  /** DeepSeek heading only: countdown ink — green when peak is ending, red when it approaches. */
+  readonly countdownColor?: CSSProperties['color']
+  /** DeepSeek heading only: under five minutes to the boundary, so the countdown waves. */
+  readonly urgent?: boolean
+  /** The provider breakdown line, rendered with its first segment emphasized. */
+  readonly detail?: boolean
+}
+
+/** Below this many milliseconds to the boundary, the countdown starts waving. */
+const URGENT_MS = 5 * 60_000
+
+/** The multi-color wave played by a near-zero countdown and chip timer. */
+const WAVE_ANIMATION = 'dsh-balance-wave 1.6s ease-in-out infinite'
+
+/**
+ * Inject the wave keyframes once per document: success → warn → error ink,
+ * cycling. A plugin cannot ship a stylesheet, so the animation lives in a
+ * single idempotent `<style>` element the first chip mounts.
+ */
+function ensureWaveKeyframes(): void {
+  if (typeof document === 'undefined' || document.getElementById('dsh-balance-keyframes') !== null) return
+  const style = document.createElement('style')
+  style.id = 'dsh-balance-keyframes'
+  style.textContent = '@keyframes dsh-balance-wave{0%,100%{color:var(--dsw-alias-state-success-primary)}30%{color:var(--dsw-alias-state-warn-primary)}60%{color:var(--dsw-alias-state-error-primary)}}'
+  document.head.appendChild(style)
+}
+
+/** Whether the viewer asked the platform to avoid motion. */
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 }
 
 /**
@@ -707,31 +737,59 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
     const countdown = peak
       ? `off-peak in ${formatCountdown(ms)}`
       : to === 'peak' && ms <= HOUR_MS ? `peak in ${formatCountdown(ms)}` : undefined
-    lines.push({ text: `${state.heading} · ${peak ? 'Peak billing' : 'Off-peak · 50% price'}`, countdown, peak })
+    lines.push({
+      text: `${state.heading} · ${peak ? 'Peak billing' : 'Off-peak · 50% price'}`,
+      countdown,
+      peak,
+      // The countdown reads as relief or warning, so its ink is the OPPOSITE
+      // of the status: green while the red window drains away, red while it
+      // approaches through the last hour of off-peak.
+      countdownColor: peak
+        ? 'var(--dsw-alias-state-success-primary)'
+        : 'var(--dsw-alias-state-error-primary)',
+      urgent: countdown !== undefined && ms <= URGENT_MS,
+    })
     lines.push({ text: peakWindowsLocalLabel(now), muted: true })
   } else {
     lines.push({ text: state.heading })
   }
-  lines.push({ text: state.detail })
+  lines.push({ text: state.detail, detail: true })
   lines.push({ text: 'Click to refresh', muted: true })
   return lines
+}
+
+/** The chip's inline timer, with the tone its ink and wave follow. */
+export interface ChipTimer {
+  readonly text: string
+  readonly peak: boolean
+  readonly urgent: boolean
+  readonly color: CSSProperties['color']
 }
 
 /**
  * The chip's inline timer: the countdown to the next billing boundary, shown
  * beside the dot — always during peak, and in the last hour of off-peak.
  * Undefined otherwise, so quiet off-peak hours and every other provider stay
- * bare. Minute granularity is the point: the chip repaints on the 60s poll,
- * which keeps the timer honest without a second clock.
+ * bare. Its ink follows the tooltip's relief/warning rule (green while peak
+ * drains, red while it approaches), and under five minutes it waves. Minute
+ * granularity is the point: the chip repaints on the 60s poll, which keeps
+ * the timer honest without a second clock.
  * @param now - the render instant (defaults to now).
- * @returns the countdown text, or undefined when there is nothing to count.
+ * @returns the timer, or undefined when there is nothing to count.
  */
-export function chipTimer(now: Date = new Date()): string | undefined {
+export function chipTimer(now: Date = new Date()): ChipTimer | undefined {
   const peak = isPeakHour(now)
   const { at, to } = nextTransition(now)
   const ms = at.getTime() - now.getTime()
-  if (peak) return formatCountdown(ms)
-  return to === 'peak' && ms <= HOUR_MS ? formatCountdown(ms) : undefined
+  if (!peak && !(to === 'peak' && ms <= HOUR_MS)) return undefined
+  return {
+    text: formatCountdown(ms),
+    peak,
+    urgent: ms <= URGENT_MS,
+    color: peak
+      ? 'var(--dsw-alias-state-success-primary)'
+      : 'var(--dsw-alias-state-error-primary)',
+  }
 }
 
 /** Hover panel in the DSH popover idiom: elevated layer, hairline border, 12px text. */
@@ -768,60 +826,97 @@ const tooltipCountdownStyle: CSSProperties = {
   marginLeft: 'auto',
   paddingLeft: 14,
   fontVariantNumeric: 'tabular-nums',
-  fontWeight: 600,
-  color: 'var(--dsw-alias-label-primary)',
+  fontWeight: 700,
 }
 
-/** The timer beside the chip's dot: quiet, tabular, on the same text line. */
+/** The timer beside the chip's dot: small, tabular, on the same text line. */
 const chipTimerStyle: CSSProperties = {
   fontSize: 11,
   color: 'var(--dsw-alias-label-tertiary)',
   fontVariantNumeric: 'tabular-nums',
 }
 
+/** Tinted pill holding the billing status word; `color` is the state token. */
+function statusPillStyle(color: string): CSSProperties {
+  return {
+    padding: '1px 8px',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+    color,
+    background: `color-mix(in srgb, ${color} 14%, transparent)`,
+    border: `0.5px solid color-mix(in srgb, ${color} 38%, transparent)`,
+  }
+}
+
+/** The wave animation, unless the viewer opted out of motion. */
+function waveStyle(urgent: boolean | undefined): CSSProperties {
+  return urgent === true && !prefersReducedMotion() ? { animation: WAVE_ANIMATION } : {}
+}
+
 /**
  * The chip's hover tooltip: a styled panel in the DSH popover idiom — the
  * native `title` attribute renders as an unstyled OS bubble that reads as a
- * glitch against the app chrome. The header carries the provider mark and,
- * for DeepSeek, the billing status tinted by window with the countdown on
- * the right; a hairline separates the content from the footer hint. It is
- * `position: fixed` from the chip's measured rect, so no ancestor's overflow
- * can clip it, and it anchors above the chip, since both seats sit at the
- * bottom of the window.
+ * glitch against the app chrome. A 3px accent bar on the left carries the
+ * billing state (red peak, green off-peak, business blue elsewhere); the
+ * header shows the provider mark, the status in a tinted pill, and the
+ * countdown on the right in relief/warning ink — waving through the state
+ * colors in its final five minutes. The breakdown's first segment is
+ * emphasized, and a hairline separates the content from the footer hint. It
+ * is `position: fixed` from the chip's measured rect, so no ancestor's
+ * overflow can clip it, and it anchors above the chip, since both seats sit
+ * at the bottom of the window.
  * @param props - the display state to describe and the chip's viewport rect.
  * @returns the tooltip element.
  */
 function ChipTooltip({ state, rect }: { readonly state: DisplayState; readonly rect: DOMRect }) {
   const lines = tooltipLines(state)
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - 356))
+  const peakInk = 'var(--dsw-alias-state-error-primary)'
+  const offInk = 'var(--dsw-alias-state-success-primary)'
+  const accent = state.kind !== 'ok'
+    ? 'var(--dsw-alias-state-warn-primary)'
+    : state.provider === 'deepseek'
+      ? (isPeakHour() ? peakInk : offInk)
+      : 'var(--dsw-alias-state-business-primary)'
   return (
-    <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6 }}>
+    <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6, borderLeft: `3px solid ${accent}` }}>
       {lines.flatMap((line, index) => {
+        const isFooter = index === lines.length - 1
         const node = line.countdown !== undefined ? (
-          <span key={index} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span key={index} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {state.kind === 'ok' && <ProviderLogo provider={state.provider} />}
-            <span
-              style={{
-                fontWeight: 600,
-                color: line.peak === true
-                  ? 'var(--dsw-alias-state-error-primary)'
-                  : 'var(--dsw-alias-state-success-primary)',
-              }}
-            >
-              {line.text}
+            <span style={statusPillStyle(line.peak === true ? peakInk : offInk)}>{line.text}</span>
+            <span style={{ ...tooltipCountdownStyle, color: line.countdownColor, ...waveStyle(line.urgent) }}>
+              {line.countdown}
             </span>
-            <span style={tooltipCountdownStyle}>{line.countdown}</span>
+          </span>
+        ) : line.detail === true ? (
+          <span key={index}>
+            <span style={{ fontWeight: 600 }}>{line.text.split(' · ')[0]}</span>
+            <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>
+              {line.text.includes(' · ') ? ` · ${line.text.split(' · ').slice(1).join(' · ')}` : ''}
+            </span>
           </span>
         ) : (
           <span key={index} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {index === 0 && state.kind === 'ok' && <ProviderLogo provider={state.provider} />}
-            <span style={line.muted === true ? { color: 'var(--dsw-alias-label-secondary)' } : undefined}>
+            <span
+              style={
+                isFooter
+                  ? { color: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }
+                  : line.muted === true
+                    ? { color: 'var(--dsw-alias-label-secondary)' }
+                    : { fontWeight: 600 }
+              }
+            >
               {line.text}
             </span>
           </span>
         )
         // A hairline before the footer line separates content from the hint.
-        return index === lines.length - 1 && lines.length > 1
+        return isFooter && lines.length > 1
           ? [<div key={`divider-${index}`} style={tooltipDividerStyle} />, node]
           : [node]
       })}
@@ -1012,6 +1107,8 @@ export function BalanceChip({
   // The hero tool row and the composer dock are different DOM subtrees, so the
   // swap on the first send reads as one continuous pill travelling down.
   useLayoutEffect(() => {
+    // The wave keyframes live in one idempotent <style> the first chip mounts.
+    ensureWaveKeyframes()
     const anchor = anchorRef.current
     if (anchor === null) return
     flyChipIn(anchor)
@@ -1088,9 +1185,10 @@ export function BalanceChip({
           <span style={amountStyle}>{state.symbol}{state.total}</span>
           <span role="img" aria-label={state.detail} style={{ ...dotBaseStyle, background: state.dotColor }} />
           {/* DeepSeek carries its billing countdown right on the strip, next to
-              the dot — the tooltip explains it, the timer just ticks. */}
-          {state.provider === 'deepseek' && timer !== undefined && (
-            <span style={chipTimerStyle}>{timer}</span>
+              the dot — green while the peak drains, red while it approaches,
+              waving through the state colors in its final five minutes. */}
+          {timer !== undefined && (
+            <span style={{ ...chipTimerStyle, color: timer.color, ...waveStyle(timer.urgent) }}>{timer.text}</span>
           )}
         </button>
       )}

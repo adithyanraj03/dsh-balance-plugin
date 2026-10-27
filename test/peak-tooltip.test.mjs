@@ -62,6 +62,7 @@ function loadTooltip() {
   const source = [
     extractConst(bundle, 'HOUR_MS'),
     extractConst(bundle, 'DAY_MS'),
+    extractConst(bundle, 'URGENT_MS'),
     extractConst(bundle, 'PEAK_WINDOWS_UTC'),
     extractFunction(bundle, 'isPeakHour'),
     extractFunction(bundle, 'nextTransition'),
@@ -100,9 +101,15 @@ test('peak always counts down to off-peak', () => {
   assert.match(lines[0].text, /Peak billing$/)
   assert.equal(lines[0].countdown, 'off-peak in 2h')
   assert.equal(lines[0].peak, true)
+  assert.match(lines[0].countdownColor, /success/, 'relief ink while peak drains')
+  assert.equal(lines[0].urgent, false)
   assert.match(lines[1].text, /GMT\+5:30/)
+  assert.equal(lines[2].detail, true)
   assert.match(lines[2].text, /Total \$11\.97/)
   assert.equal(lines[3].text, 'Click to refresh')
+  const hot = tooltipLines(deepseekOk(true), new Date('2026-09-07T03:57:30Z'))
+  assert.equal(hot[0].countdown, 'off-peak in 3m')
+  assert.equal(hot[0].urgent, true)
 })
 
 test('off-peak counts down to peak only within the last hour', () => {
@@ -113,9 +120,18 @@ test('off-peak counts down to peak only within the last hour', () => {
   assert.equal(far[0].countdown, undefined)
 })
 
-test('the chip timer mirrors the tooltip countdown', () => {
-  assert.equal(chipTimer(new Date('2026-09-07T02:00:00Z')), '2h')
-  assert.equal(chipTimer(new Date('2026-09-07T05:15:00Z')), '45m')
+test('the chip timer mirrors the tooltip countdown with relief/warning ink', () => {
+  const peak = chipTimer(new Date('2026-09-07T02:00:00Z'))
+  assert.equal(peak.text, '2h')
+  assert.equal(peak.peak, true)
+  assert.equal(peak.urgent, false)
+  assert.match(peak.color, /success/, 'green while the peak drains')
+  const near = chipTimer(new Date('2026-09-07T05:15:00Z'))
+  assert.equal(near.text, '45m')
+  assert.match(near.color, /error/, 'red while the peak approaches')
+  const hot = chipTimer(new Date('2026-09-07T03:57:30Z'))
+  assert.equal(hot.text, '3m')
+  assert.equal(hot.urgent, true, 'under five minutes waves')
   assert.equal(chipTimer(new Date('2026-09-07T20:00:00Z')), undefined)
   assert.equal(chipTimer(new Date('2026-09-12T12:00:00Z')), undefined)
 })
@@ -151,9 +167,14 @@ test('the tooltip is a styled DSH popover, not a native title', () => {
   assert.match(bundle, /--dsw-alias-bg-layer-1/)
   assert.match(bundle, /--dsw-alias-border-l2/)
   // Header countdown and chip timer use fixed-width digits; a hairline
-  // separates the content from the footer hint.
+  // separates the content from the footer hint; the accent bar and tinted
+  // pill are built with color-mix; the sub-5-minute wave keyframes ship with
+  // the bundle.
   assert.match(bundle, /tabular-nums/)
   assert.match(bundle, /--dsw-alias-border-l1/)
+  assert.match(bundle, /color-mix\(in srgb/)
+  assert.match(bundle, /borderLeft/)
+  assert.match(bundle, /@keyframes dsh-balance-wave/)
   // The chip elements carry no native title attribute any more.
   assert.doesNotMatch(bundle, /title: `Balance|title: `\$\{state\.title\}|title: "Loading balance/)
 })

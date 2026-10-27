@@ -99,18 +99,29 @@ if (mod.formatCountdown(20_000) !== 'under 1m') throw new Error('countdown under
 const deepseekOk = (peak) => ({ kind: 'ok', provider: 'deepseek', symbol: '$', total: '11.97', heading: 'DeepSeek', detail: 'Total $11.97 · Granted $0.00 · Topped up $11.97', peak })
 const peakTip = mod.tooltipLines(deepseekOk(true), new Date('2026-09-07T02:00:00Z'))
 if (!peakTip[0].text.includes('Peak billing') || peakTip[0].countdown !== 'off-peak in 2h' || peakTip[0].peak !== true) throw new Error(`peak tooltip: ${JSON.stringify(peakTip[0])}`)
+// Relief/warning ink: the countdown is green while peak drains, red while it approaches.
+if (!peakTip[0].countdownColor.includes('success')) throw new Error(`peak countdown ink: ${peakTip[0].countdownColor}`)
+if (peakTip[0].urgent !== false || peakTip[2].detail !== true) throw new Error(`peak tooltip flags: ${JSON.stringify(peakTip)}`)
 if (!/Peak .*\d/.test(peakTip[1].text) || !/\(GMT|UTC\)/.test(peakTip[1].text)) throw new Error(`window label: ${peakTip[1].text}`)
 const offTip = mod.tooltipLines(deepseekOk(false), new Date('2026-09-07T05:15:00Z'))
 if (!offTip[0].text.includes('Off-peak') || offTip[0].countdown !== 'peak in 45m') throw new Error(`off-peak tooltip: ${JSON.stringify(offTip[0])}`)
+if (!offTip[0].countdownColor.includes('error')) throw new Error(`off-peak countdown ink: ${offTip[0].countdownColor}`)
+const hotTip = mod.tooltipLines(deepseekOk(true), new Date('2026-09-07T03:57:30Z'))
+if (hotTip[0].urgent !== true || hotTip[0].countdown !== 'off-peak in 3m') throw new Error(`urgent tooltip: ${JSON.stringify(hotTip[0])}`)
 const farTip = mod.tooltipLines(deepseekOk(false), new Date('2026-09-07T20:00:00Z'))
 if (farTip[0].countdown !== undefined) throw new Error(`far off-peak must not count down: ${JSON.stringify(farTip[0])}`)
 const orTip = mod.tooltipLines({ kind: 'ok', provider: 'openrouter', symbol: '$', total: '9.74', heading: 'OpenRouter', detail: 'Remaining $9.74' }, new Date('2026-09-07T02:00:00Z'))
 if (orTip[0].text !== 'OpenRouter' || orTip[0].countdown !== undefined || orTip.some((line) => line.text.includes('Peak'))) throw new Error('openrouter tooltip must stay plain')
-// The chip's inline timer mirrors the tooltip's countdown rules.
-if (mod.chipTimer(new Date('2026-09-07T02:00:00Z')) !== '2h') throw new Error('chip timer peak')
-if (mod.chipTimer(new Date('2026-09-07T05:15:00Z')) !== '45m') throw new Error('chip timer near peak')
+// The chip's inline timer mirrors the tooltip's countdown rules, with the
+// relief/warning ink and the sub-5-minute urgency.
+const ctPeak = mod.chipTimer(new Date('2026-09-07T02:00:00Z'))
+if (ctPeak.text !== '2h' || ctPeak.peak !== true || ctPeak.urgent !== false || !ctPeak.color.includes('success')) throw new Error(`chip timer peak: ${JSON.stringify(ctPeak)}`)
+const ctNear = mod.chipTimer(new Date('2026-09-07T05:15:00Z'))
+if (ctNear.text !== '45m' || ctNear.peak !== false || !ctNear.color.includes('error')) throw new Error(`chip timer near peak: ${JSON.stringify(ctNear)}`)
+const ctHot = mod.chipTimer(new Date('2026-09-07T03:57:30Z'))
+if (ctHot.text !== '3m' || ctHot.urgent !== true) throw new Error(`chip timer urgent: ${JSON.stringify(ctHot)}`)
 if (mod.chipTimer(new Date('2026-09-07T20:00:00Z')) !== undefined) throw new Error('chip timer quiet off-peak')
-console.log('tooltip assertions: PASS (peak countdown, off-peak 1h window, local windows, chip timer, plain providers)')
+console.log('tooltip assertions: PASS (relief/warning ink, urgent wave, local windows, chip timer, plain providers)')
 
 // Apply with a fake slot registry and a fake plugin scope exposing the optional
 // model-directory service lazily (the real service registers after this plugin).
