@@ -1,6 +1,5 @@
 # dsh-balance-plugin
 
-[![npm package](https://img.shields.io/badge/npm-dsh--balance--plugin-cb3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/dsh-balance-plugin)
 [![GitHub release](https://img.shields.io/github/v/release/adithyanraj03/dsh-balance-plugin?sort=semver&color=4D6BFE)](https://github.com/adithyanraj03/dsh-balance-plugin/releases)
 [![CI](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-3da639.svg)](LICENSE)
@@ -143,13 +142,9 @@ Requirements: a DeepSeek Harness install with the web profile (`dsh web`) and No
 
 > The plugin is self-contained: it needs no extra services, no configuration file, and no core patch. Installation adds one dependency and one status-strip pill.
 
-### From npm
-
-```sh
-pnpm dsh plugin --profile web add dsh-balance-plugin
-```
-
 ### From GitHub
+
+> Not published on npm: the `dsh-balance-plugin` name there belongs to an unrelated package. Install from GitHub or a clone.
 
 ```sh
 pnpm dsh plugin --profile web add github:adithyanraj03/dsh-balance-plugin
@@ -288,7 +283,7 @@ The `@deepseek-ai/*` platform packages are **optional peer dependencies** suppli
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the full history. Every release is also published on [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases) and [npm](https://www.npmjs.com/package/dsh-balance-plugin).
+See [CHANGELOG.md](CHANGELOG.md) for the full history. Every release is also published on [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases).
 
 ## License
 

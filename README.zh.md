@@ -1,6 +1,5 @@
 # dsh-balance-plugin
 
-[![npm 包](https://img.shields.io/badge/npm-dsh--balance--plugin-cb3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/dsh-balance-plugin)
 [![GitHub 发布](https://img.shields.io/github/v/release/adithyanraj03/dsh-balance-plugin?sort=semver&color=4D6BFE)](https://github.com/adithyanraj03/dsh-balance-plugin/releases)
 [![CI](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml)
 [![许可证：MIT](https://img.shields.io/badge/license-MIT-3da639.svg)](LICENSE)
@@ -140,13 +139,9 @@ DeepSeek 的**空闲时段价格为高峰时段的一半**。胶囊通过状态�
 
 > 插件是自包含的：不需要额外服务、不需要配置文件、不需要核心补丁。安装只会新增一个依赖和状态条中的一枚胶囊。
 
-### 从 npm 安装
-
-```sh
-pnpm dsh plugin --profile web add dsh-balance-plugin
-```
-
 ### 从 GitHub 安装
+
+> 未发布到 npm：npm 上的 `dsh-balance-plugin` 名称属于另一个无关的包。请从 GitHub 或本地克隆安装。
 
 ```sh
 pnpm dsh plugin --profile web add github:adithyanraj03/dsh-balance-plugin
@@ -285,7 +280,7 @@ pnpm run verify    # 在桩模块表上执行客户端产物并校验契约
 
 ## 更新日志
 
-完整历史见 [CHANGELOG.md](CHANGELOG.md)。每次发布同时发布在 [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases) 与 [npm](https://www.npmjs.com/package/dsh-balance-plugin)。
+完整历史见 [CHANGELOG.md](CHANGELOG.md)。每次发布同时发布在 [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases)。
 
 ## 许可证
 

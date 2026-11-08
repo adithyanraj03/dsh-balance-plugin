@@ -4,8 +4,9 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Every release is also published on [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases)
-and on [npm](https://www.npmjs.com/package/dsh-balance-plugin).
+Every release is also published on [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases).
+The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
+project is not published there.
 
 ## [0.11.0] — 2026-11-08
 
