@@ -1,8 +1,8 @@
-# dsh-balance
+# dsh-balance-plugin
 
-[![npm package](https://img.shields.io/badge/npm-%40andrecgoncalves%2Fdsh--balance-cb3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance)
-[![GitHub release](https://img.shields.io/github/v/release/andregoncalves/dsh-balance?sort=semver&color=4D6BFE)](https://github.com/andregoncalves/dsh-balance/releases)
-[![CI](https://github.com/andregoncalves/dsh-balance/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/andregoncalves/dsh-balance/actions/workflows/ci.yml)
+[![npm package](https://img.shields.io/badge/npm-dsh--balance--plugin-cb3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/dsh-balance-plugin)
+[![GitHub release](https://img.shields.io/github/v/release/adithyanraj03/dsh-balance-plugin?sort=semver&color=4D6BFE)](https://github.com/adithyanraj03/dsh-balance-plugin/releases)
+[![CI](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-3da639.svg)](LICENSE)
 [![node >= 22.18](https://img.shields.io/badge/node-%E2%89%A5%2022.18-43853d?logo=node.js&logoColor=white)](https://nodejs.org)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE)](https://github.com/deepseek-ai/deepseek-harness)
@@ -21,7 +21,7 @@ On DeepSeek the chip also tracks **peak / off-peak billing** — the status dot 
 
 ## Contents
 
-- [Why dsh-balance?](#why-dsh-balance)
+- [Why dsh-balance-plugin?](#why-dsh-balance-plugin)
 - [Lightweight by design](#lightweight-by-design)
 - [Highlights](#highlights)
 - [Screenshots](#screenshots)
@@ -37,7 +37,7 @@ On DeepSeek the chip also tracks **peak / off-peak billing** — the status dot 
 - [Changelog](#changelog)
 - [License](#license)
 
-## Why dsh-balance?
+## Why dsh-balance-plugin?
 
 - **Provider-aware, not DeepSeek-only.** It follows the **active model's provider** across DeepSeek, OpenRouter, Moonshot/Kimi, Zhipu/GLM, and MiniMax — the chip changes the moment you switch models.
 - **The smallest thing that does the job.** No settings panel, no cost projection, no extra services. One route, one chip, ~11 kB gzipped.
@@ -45,7 +45,7 @@ On DeepSeek the chip also tracks **peak / off-peak billing** — the status dot 
 
 ## Lightweight by design
 
-`dsh-balance` is deliberately minimal, and it adds no machinery to the Harness:
+`dsh-balance-plugin` is deliberately minimal, and it adds no machinery to the Harness:
 
 | | |
 |---|---|
@@ -146,13 +146,13 @@ Requirements: a DeepSeek Harness install with the web profile (`dsh web`) and No
 ### From npm
 
 ```sh
-pnpm dsh plugin --profile web add @andrecgoncalves/dsh-balance
+pnpm dsh plugin --profile web add dsh-balance-plugin
 ```
 
 ### From GitHub
 
 ```sh
-pnpm dsh plugin --profile web add github:andregoncalves/dsh-balance
+pnpm dsh plugin --profile web add github:adithyanraj03/dsh-balance-plugin
 ```
 
 The package builds itself on install (`prepare` → `pnpm run build`), so `lib/` does not need to be committed.
@@ -160,8 +160,8 @@ The package builds itself on install (`prepare` → `pnpm run build`), so `lib/`
 ### From a local clone (development)
 
 ```sh
-git clone https://github.com/andregoncalves/dsh-balance.git
-cd dsh-balance
+git clone https://github.com/adithyanraj03/dsh-balance-plugin.git
+cd dsh-balance-plugin
 pnpm install
 pnpm run build
 pnpm dsh plugin --profile web add link:"$PWD"
@@ -179,7 +179,7 @@ The package declares **`dsh.bundle`**, so `dsh plugin add` appends it to your pr
 Add the bundle to `~/.dsh/profiles/web/package.json`:
 
 ```json
-"dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@andrecgoncalves/dsh-balance"] } }
+"dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "dsh-balance-plugin"] } }
 ```
 
 The bundle's patch then inserts the row. If you prefer a plain dependency instead, drop the `dsh.bundle` handling and add the row yourself to `~/.dsh/profiles/web/cordis.patch.yml`:
@@ -187,7 +187,7 @@ The bundle's patch then inserts the row. If you prefer a plain dependency instea
 ```yaml
 - insert:
     - id: dsh-balance
-      name: "@andrecgoncalves/dsh-balance"
+      name: "dsh-balance-plugin"
 ```
 
 Either way the `id` is the plugin's internal Cordis name and stays `dsh-balance`; the `name` is the installed package.
@@ -240,7 +240,7 @@ Then add a route in **Settings → Models** for the provider you want to preview
 
 ## How it works
 
-`dsh-balance` is a **dual-face Cordis package**: one npm package with a host half and a browser half.
+`dsh-balance-plugin` is a **dual-face Cordis package**: one npm package with a host half and a browser half.
 
 | Part | File | Job |
 |---|---|---|
@@ -288,8 +288,8 @@ The `@deepseek-ai/*` platform packages are **optional peer dependencies** suppli
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the full history. Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases) and [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
+See [CHANGELOG.md](CHANGELOG.md) for the full history. Every release is also published on [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases) and [npm](https://www.npmjs.com/package/dsh-balance-plugin).
 
 ## License
 
-[MIT](LICENSE) © 2026 Andre Goncalves
+[MIT](LICENSE) © 2026 Adithya N Raj

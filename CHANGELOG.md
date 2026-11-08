@@ -4,8 +4,22 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
-and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
+Every release is also published on [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases)
+and on [npm](https://www.npmjs.com/package/dsh-balance-plugin).
+
+## [0.11.0] — 2026-11-08
+
+### Changed
+
+- The package is renamed **`dsh-balance-plugin`** (was `@andrecgoncalves/dsh-balance`).
+  Authorship and the MIT license now carry **Adithya N Raj**; every badge, install
+  command, and release link in the READMEs points at `adithyanraj03/dsh-balance-plugin`.
+  The plugin's internal Cordis name and slot id (`dsh-balance` / `balance`) are
+  unchanged, so runtime behavior and stored state are untouched. Because the npm
+  name changed, installed profiles need one re-add:
+  `pnpm dsh plugin --profile web remove @andrecgoncalves/dsh-balance` then
+  `pnpm dsh plugin --profile web add link:<clone-path>` (or `dsh-balance-plugin`
+  once published).
 
 ## [0.10.9] — 2026-11-08
 
@@ -323,11 +337,11 @@ First public release.
 - Host route `GET /plugins/balance?kind=…`; the API key is resolved on the host through the
   credentials seam and never reaches the browser.
 - Automatic refresh every 60 seconds, on click, on session change, and on model switch.
-- `dsh.bundle` manifest, so `dsh plugin --profile web add @andrecgoncalves/dsh-balance` wires the
+- `dsh.bundle` manifest, so `dsh plugin --profile web add dsh-balance-plugin` wires the
   sidebar row without a manual profile patch.
 - Mock mode (`DSH_BALANCE_MOCK=1` or `?mock=1`) for previewing any provider without an account.
 - Bilingual README (English and Chinese), light/dark screenshots, and a `screenshots.json`
   declaration for plugin storefronts.
 
-[0.4.1]: https://github.com/andregoncalves/dsh-balance/releases/tag/v0.4.1
-[0.4.0]: https://github.com/andregoncalves/dsh-balance/releases/tag/v0.4.0
+[0.4.1]: https://github.com/adithyanraj03/dsh-balance-plugin/releases/tag/v0.4.1
+[0.4.0]: https://github.com/adithyanraj03/dsh-balance-plugin/releases/tag/v0.4.0

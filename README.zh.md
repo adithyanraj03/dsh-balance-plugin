@@ -1,8 +1,8 @@
-# dsh-balance
+# dsh-balance-plugin
 
-[![npm 包](https://img.shields.io/badge/npm-%40andrecgoncalves%2Fdsh--balance-cb3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance)
-[![GitHub 发布](https://img.shields.io/github/v/release/andregoncalves/dsh-balance?sort=semver&color=4D6BFE)](https://github.com/andregoncalves/dsh-balance/releases)
-[![CI](https://github.com/andregoncalves/dsh-balance/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/andregoncalves/dsh-balance/actions/workflows/ci.yml)
+[![npm 包](https://img.shields.io/badge/npm-dsh--balance--plugin-cb3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/dsh-balance-plugin)
+[![GitHub 发布](https://img.shields.io/github/v/release/adithyanraj03/dsh-balance-plugin?sort=semver&color=4D6BFE)](https://github.com/adithyanraj03/dsh-balance-plugin/releases)
+[![CI](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/adithyanraj03/dsh-balance-plugin/actions/workflows/ci.yml)
 [![许可证：MIT](https://img.shields.io/badge/license-MIT-3da639.svg)](LICENSE)
 [![node >= 22.18](https://img.shields.io/badge/node-%E2%89%A5%2022.18-43853d?logo=node.js&logoColor=white)](https://nodejs.org)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE)](https://github.com/deepseek-ai/deepseek-harness)
@@ -21,7 +21,7 @@
 
 ## 目录
 
-- [为什么选择 dsh-balance？](#为什么选择-dsh-balance)
+- [为什么选择 dsh-balance-plugin？](#为什么选择-dsh-balance-plugin)
 - [轻量设计](#轻量设计)
 - [亮点](#亮点)
 - [截图](#截图)
@@ -37,7 +37,7 @@
 - [更新日志](#更新日志)
 - [许可证](#许可证)
 
-## 为什么选择 dsh-balance？
+## 为什么选择 dsh-balance-plugin？
 
 - **感知服务商，不止 DeepSeek。** 它会跟随**当前活跃模型所属的服务商**，覆盖 DeepSeek、OpenRouter、Moonshot/Kimi、Zhipu/GLM 与 MiniMax——切换模型时胶囊立即切换。
 - **只做一件事的最小实现。** 没有设置面板、没有费用估算、没有额外服务。一条路由，一个胶囊，gzip 后约 11 kB。
@@ -45,7 +45,7 @@
 
 ## 轻量设计
 
-`dsh-balance` 刻意保持极简，不给 Harness 增加任何机制：
+`dsh-balance-plugin` 刻意保持极简，不给 Harness 增加任何机制：
 
 | | |
 |---|---|
@@ -143,13 +143,13 @@ DeepSeek 的**空闲时段价格为高峰时段的一半**。胶囊通过状态�
 ### 从 npm 安装
 
 ```sh
-pnpm dsh plugin --profile web add @andrecgoncalves/dsh-balance
+pnpm dsh plugin --profile web add dsh-balance-plugin
 ```
 
 ### 从 GitHub 安装
 
 ```sh
-pnpm dsh plugin --profile web add github:andregoncalves/dsh-balance
+pnpm dsh plugin --profile web add github:adithyanraj03/dsh-balance-plugin
 ```
 
 该包会在安装时自行构建（`prepare` → `pnpm run build`），因此无需把 `lib/` 提交到仓库。
@@ -157,8 +157,8 @@ pnpm dsh plugin --profile web add github:andregoncalves/dsh-balance
 ### 从本地克隆安装（开发用）
 
 ```sh
-git clone https://github.com/andregoncalves/dsh-balance.git
-cd dsh-balance
+git clone https://github.com/adithyanraj03/dsh-balance-plugin.git
+cd dsh-balance-plugin
 pnpm install
 pnpm run build
 pnpm dsh plugin --profile web add link:"$PWD"
@@ -176,7 +176,7 @@ pnpm dsh plugin --profile web add link:"$PWD"
 把该 bundle 加入 `~/.dsh/profiles/web/package.json`：
 
 ```json
-"dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@andrecgoncalves/dsh-balance"] } }
+"dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "dsh-balance-plugin"] } }
 ```
 
 bundle 的补丁随后会插入该行。如果你更希望把它当作普通依赖，可以不走 `dsh.bundle`，而是自己在 `~/.dsh/profiles/web/cordis.patch.yml` 中加入：
@@ -184,7 +184,7 @@ bundle 的补丁随后会插入该行。如果你更希望把它当作普通依�
 ```yaml
 - insert:
     - id: dsh-balance
-      name: "@andrecgoncalves/dsh-balance"
+      name: "dsh-balance-plugin"
 ```
 
 两种方式中，`id` 都是插件内部的 Cordis 名称，保持 `dsh-balance` 不变；`name` 是已安装的包名。
@@ -237,7 +237,7 @@ DSH_BALANCE_MOCK=1 dsh web
 
 ## 实现原理
 
-`dsh-balance` 是一个**双面包（dual-face Cordis package）**：同一个 npm 包，包含宿主端与浏览器端两个部分。
+`dsh-balance-plugin` 是一个**双面包（dual-face Cordis package）**：同一个 npm 包，包含宿主端与浏览器端两个部分。
 
 | 部分 | 文件 | 职责 |
 |---|---|---|
@@ -285,8 +285,8 @@ pnpm run verify    # 在桩模块表上执行客户端产物并校验契约
 
 ## 更新日志
 
-完整历史见 [CHANGELOG.md](CHANGELOG.md)。每次发布同时发布在 [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases) 与 [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance)。
+完整历史见 [CHANGELOG.md](CHANGELOG.md)。每次发布同时发布在 [GitHub Releases](https://github.com/adithyanraj03/dsh-balance-plugin/releases) 与 [npm](https://www.npmjs.com/package/dsh-balance-plugin)。
 
 ## 许可证
 
-[MIT](LICENSE) © 2026 Andre Goncalves
+[MIT](LICENSE) © 2026 Adithya N Raj
