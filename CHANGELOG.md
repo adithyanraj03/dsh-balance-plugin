@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.8] — 2026-11-08
+
+### Added
+
+- The open popover now **moves while you hover**. Previously a side panel
+  opening (or the sidebar collapsing) only repositioned the popover on the
+  next hover or a window resize. A `MutationObserver` on the document, live
+  only while the popover is open and coalescing to one re-measure per
+  animation frame, catches any layout change, so the popover glides to
+  clear the bar the moment it appears — the "it should have auto moved"
+  case, without the observer ever running when nothing is shown.
+
+### Documentation
+
+- `README.md` / `README.zh.md` now describe the chip countdown pill (teal
+  relief / red pre-peak, sweeping clock, sub-five-minute wave) and the
+  center-on-chip, bar-aware popover, which had lagged the code since 0.8.0.
+
 ## [0.10.7] — 2026-10-27
 
 ### Changed

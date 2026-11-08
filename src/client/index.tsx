@@ -1233,11 +1233,11 @@ export function BalanceChip({
   if (variant === 'hero' && !blank) return null
 
   // The tooltip measures the chip on show, so it can float `position: fixed`
-  // above the seat without being clipped by ancestor overflow. The boundary
-  // is the conversation column's right edge — the laid-out row the seat sits
-  // in — so a docked side panel can never cover the popover: it hangs from
-  // the chip's left normally, and slides left (smoothly, via the `left`
-  // transition) when the column is narrower than the panel.
+  // above the seat without being clipped by ancestor overflow. It centers on
+  // the chip and is clamped to the lane between the bars `popoverBounds`
+  // finds, so a side panel or sidebar can never cover it: it sits centered
+  // normally and slides the minimum distance (smoothly, via the `left`
+  // transition) when a bar narrows the lane.
   const showTip = useCallback(() => {
     const anchor = anchorRef.current
     if (anchor === null) return
@@ -1245,14 +1245,27 @@ export function BalanceChip({
   }, [])
   const hideTip = useCallback(() => { setTip(null) }, [])
 
-  // While the popover is open, a window resize re-measures the seat and the
-  // boundary, so it glides to the new spot instead of stranding under the
-  // panel; the next hover re-measures regardless.
+  // While the popover is open, a window resize or any layout mutation — a
+  // side panel opening, the sidebar collapsing — re-measures the seat and
+  // the lane, so the popover glides to the new spot instead of stranding
+  // under a bar. Mutations coalesce into one measurement per frame; the
+  // next hover re-measures regardless.
   useEffect(() => {
     if (tip === null) return
     const onMove = () => { showTip() }
+    let frame = 0
+    const onMutation = () => {
+      if (frame !== 0) return
+      frame = requestAnimationFrame(() => { frame = 0; showTip() })
+    }
     window.addEventListener('resize', onMove)
-    return () => { window.removeEventListener('resize', onMove) }
+    const observer = new MutationObserver(onMutation)
+    observer.observe(document.body, { attributes: true, attributeFilter: ['style', 'class'], childList: true, subtree: true })
+    return () => {
+      window.removeEventListener('resize', onMove)
+      observer.disconnect()
+      if (frame !== 0) cancelAnimationFrame(frame)
+    }
   }, [tip !== null, showTip])
 
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll

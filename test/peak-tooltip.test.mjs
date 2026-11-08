@@ -192,6 +192,7 @@ test('the tooltip is a styled DSH popover, not a native title', () => {
   assert.match(bundle, /bounds\.right - width/)
   assert.match(bundle, /bounds\.left, Math\.min/)
   assert.match(bundle, /left 220ms/)
+  assert.match(bundle, /new MutationObserver/)
   // The chip elements carry no native title attribute any more.
   assert.doesNotMatch(bundle, /title: `Balance|title: `\$\{state\.title\}|title: "Loading balance/)
 })
