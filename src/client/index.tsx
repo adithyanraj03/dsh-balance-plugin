@@ -37,6 +37,7 @@
  * or quota (green = left, red = exhausted).
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -958,8 +959,12 @@ function ClockGlyph() {
  * countdown on the right in relief/warning ink — waving through the state
  * colors in its final five minutes. The breakdown's first segment is
  * emphasized, and a hairline separates the content from the footer hint. It
- * is `position: fixed` from the chip's measured rect, so no ancestor's
- * overflow can clip it, and it anchors ABOVE the chip (both seats sit low in
+ * is portal-mounted to `document.body` and `position: fixed` from the chip's
+ * measured rect, so no ancestor's overflow can clip it and no ancestor's
+ * transform can hijack its fixed positioning — the Electron desktop shell
+ * animates the composer subtree, and a transformed ancestor re-anchors
+ * fixed coordinates, which showed the popover clipped at the window edge
+ * there. It anchors ABOVE the chip (both seats sit low in
  * the window). Horizontally it centers on the chip — the icon is the pivot
  * — and the free lane between the bars (side panel, sidebar) is passed in:
  * the panel slides the minimum distance to stay inside it, gliding on the
@@ -983,7 +988,7 @@ function ChipTooltip({ state, rect, bounds }: { readonly state: DisplayState; re
     : state.provider === 'deepseek'
       ? (isPeakHour() ? peakInk : offInk)
       : 'var(--dsw-alias-state-business-primary)'
-  return (
+  return createPortal(
     <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6, width, minWidth: Math.min(250, width), borderLeft: `3px solid ${accent}` }}>
       {lines.flatMap((line, index) => {
         const isFooter = index === lines.length - 1
@@ -1023,7 +1028,8 @@ function ChipTooltip({ state, rect, bounds }: { readonly state: DisplayState; re
           ? [<div key={`divider-${index}`} style={tooltipDividerStyle} />, node]
           : [node]
       })}
-    </div>
+    </div>,
+    document.body,
   )
 }
 

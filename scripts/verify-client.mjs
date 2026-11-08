@@ -39,9 +39,13 @@ const jsxRuntimeStub = {
   jsx: (type, props) => ({ type, props }),
   jsxs: (type, props) => ({ type, props }),
 }
+const reactDomStub = {
+  createPortal: (node) => node,
+}
 const requireStub = (id) => {
   if (id === 'react') return reactStub
   if (id === 'react/jsx-runtime') return jsxRuntimeStub
+  if (id === 'react-dom') return reactDomStub
   throw new Error(`unexpected external require: ${id}`)
 }
 

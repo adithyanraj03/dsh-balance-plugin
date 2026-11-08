@@ -193,6 +193,10 @@ test('the tooltip is a styled DSH popover, not a native title', () => {
   assert.match(bundle, /bounds\.left, Math\.min/)
   assert.match(bundle, /left 220ms/)
   assert.match(bundle, /new MutationObserver/)
+  // The popover is portal-mounted to document.body so a transformed ancestor
+  // in the Electron desktop shell cannot re-anchor its fixed positioning.
+  assert.match(bundle, /react_dom\.createPortal/)
+  assert.match(bundle, /document\.body/)
   // The chip elements carry no native title attribute any more.
   assert.doesNotMatch(bundle, /title: `Balance|title: `\$\{state\.title\}|title: "Loading balance/)
 })

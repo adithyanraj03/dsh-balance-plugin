@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Every release is also published on [GitHub Releases](https://github.com/andregoncalves/dsh-balance/releases)
 and on [npm](https://www.npmjs.com/package/@andrecgoncalves/dsh-balance).
 
+## [0.10.9] — 2026-11-08
+
+### Fixed
+
+- The popover is no longer clipped at the window edge in the **Electron
+  desktop app**. It was rendered inline in the dock; when the desktop shell
+  animates the composer subtree, a transformed ancestor re-anchors
+  `position: fixed`, so the popover's viewport math landed it partly off
+  screen (the web profile has no such transform, which is why it looked
+  fine there). The tooltip is now portal-mounted to `document.body` — the
+  same approach the subscriptions plugin uses for its usage popover — so
+  its fixed coordinates are always true viewport coordinates.
+
 ## [0.10.8] — 2026-11-08
 
 ### Added
