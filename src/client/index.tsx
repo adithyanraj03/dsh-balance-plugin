@@ -1053,6 +1053,20 @@ function alibabaAccentInk(state: Extract<DisplayState, { kind: 'ok' }>): CSSProp
 }
 
 /**
+ * Whether a pointer position falls inside a viewport rect. The popover's
+ * dismissal watches pointer positions rather than mouseleave boundary
+ * events: seat repaints in the desktop webview can swallow the boundary
+ * event, stranding the panel open, while pointermove always arrives.
+ */
+export function pointerInsideRect(
+  x: number,
+  y: number,
+  rect: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number },
+): boolean {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
+/**
  * The horizontal lane the popover may occupy. It floats `position: fixed`
  * above the app, so it can extend past the conversation column into empty
  * chrome — the chip sits at the column's right edge, so clamping to the
@@ -1581,6 +1595,33 @@ export function BalanceChip({
   // A session switch or the hero/dock seat swap closes any open popover: the
   // new seat starts clean instead of inheriting a stranded panel.
   useEffect(() => { hideTip() }, [activeSession, blank, hideTip])
+
+  // Pointer-position dismissal: while the panel is open, any move outside
+  // both the chip and the card closes it after a short grace (so crossing
+  // the chip-to-card gap does not flicker). mouseleave alone is not trusted:
+  // seat repaints in the desktop webview can swallow the boundary event and
+  // strand the panel until an outside click.
+  useEffect(() => {
+    if (tip === null) return
+    let grace = 0
+    const onMove = (event: PointerEvent) => {
+      const anchor = anchorRef.current
+      const card = document.querySelector('[data-dsh-balance-tip]')
+      const overAnchor = anchor !== null && pointerInsideRect(event.clientX, event.clientY, anchor.getBoundingClientRect())
+      const overCard = card !== null && pointerInsideRect(event.clientX, event.clientY, card.getBoundingClientRect())
+      window.clearTimeout(grace)
+      if (overAnchor || overCard) return
+      grace = window.setTimeout(() => { hideTip() }, 80)
+    }
+    const onOut = (event: MouseEvent) => { if (event.relatedTarget === null) hideTip() }
+    document.addEventListener('pointermove', onMove, { passive: true })
+    document.addEventListener('mouseout', onOut)
+    return () => {
+      window.clearTimeout(grace)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('mouseout', onOut)
+    }
+  }, [tip !== null, hideTip])
 
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll
   // repaints it). Undefined for every other provider and quiet off-peak.

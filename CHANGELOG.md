@@ -8,6 +8,17 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.13.5] — 2026-11-11
+
+### Fixed
+
+- **Moving the pointer away now always closes the popover**, in the hero seat
+  too. Dismissal watches pointer positions against the chip and card rects
+  (80 ms grace so crossing the chip-to-card gap does not flicker) instead of
+  trusting `mouseleave`, which the desktop webview can swallow when a seat
+  repaints — the cause of the panel stranding open until an outside click.
+  Pointer leaving the window closes it as well.
+
 ## [0.13.4] — 2026-11-11
 
 ### Fixed
