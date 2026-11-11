@@ -137,3 +137,9 @@ python scripts/make-chip-preview.py  # 重新生成阿里云设计预览
 ## 许可证
 
 MIT © 2026 Adithya N Raj
+
+## 致谢
+
+- **初始上游**：Andre Goncalves 的 [andregoncalves/dsh-balance](https://github.com/andregoncalves/dsh-balance)（MIT）。本插件 fork 自该项目：最初的服务商感知余额胶囊、宿主/客户端双面结构、DeepSeek 高峰/低谷模型，以及部分早期截图资产均源于此。致谢。
+- **品牌标识**：[LobeHub icons](https://github.com/lobehub/lobe-icons) —— DeepSeek、OpenRouter、Kimi、智谱、MiniMax 与 Qwen 标识，以 `currentColor` 渲染。
+- **阿里云 Token Plan 条款**：官方 [Model Studio CLI 文档](https://www.alibabacloud.com/help/en/model-studio/cli/usage-quota) 与 [Token Plan 博客](https://modelstudio.alibabacloud.com/intl/blog/manage-token-plan-via-cli/)，以及开源的 [modelstudioai/cli](https://github.com/modelstudioai/cli)——其鉴权契约决定了 `bl` 桥接的设计。

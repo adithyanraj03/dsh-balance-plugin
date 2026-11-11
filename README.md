@@ -137,3 +137,9 @@ python scripts/make-chip-preview.py  # regenerate the Alibaba design previews
 ## Licence
 
 MIT © 2026 Adithya N Raj
+
+## Credits
+
+- **Initial upstream**: [andregoncalves/dsh-balance](https://github.com/andregoncalves/dsh-balance) by Andre Goncalves (MIT). This plugin forked from that project: the original provider-aware balance chip, the host/client split, the DeepSeek peak/off-peak model, and some of the early screenshot assets come from it. Thank you.
+- **Brand marks**: [LobeHub icons](https://github.com/lobehub/lobe-icons) — DeepSeek, OpenRouter, Kimi, Zhipu, MiniMax and Qwen glyphs, rendered in `currentColor`.
+- **Alibaba Cloud Token Plan terms**: the official [Model Studio CLI docs](https://www.alibabacloud.com/help/en/model-studio/cli/usage-quota) and [Token Plan blog](https://modelstudio.alibabacloud.com/intl/blog/manage-token-plan-via-cli/), plus the open-source [modelstudioai/cli](https://github.com/modelstudioai/cli) whose auth contract shaped the `bl` bridge.
