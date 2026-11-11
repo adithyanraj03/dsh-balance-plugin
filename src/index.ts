@@ -3,7 +3,7 @@
  *
  * Serves the account balance for the provider currently serving the active
  * model on a local HTTP route the browser half polls
- * (`GET /plugins/balance?kind=<deepseek|openrouter|moonshot|zhipu|minimax>`).
+ * (`GET /plugins/balance?kind=<deepseek|openrouter|moonshot|zhipu|minimax|alibaba>`).
  * The API key never crosses the wire: it is resolved on the host through the
  * credentials seam (`ctx.credentials`) and the launch environment, and is sent
  * only upstream to the relevant provider.
@@ -26,6 +26,8 @@
  * the chip can be previewed without an account on that platform.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
 // Type-only: pulls the webServer / credentials Context merges into this program.
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -42,7 +44,7 @@ export const inject = ['webServer']
 export const BALANCE_ENDPOINT = '/plugins/balance'
 
 /** A provider whose balance the plugin can serve. */
-export type BalanceKind = 'deepseek' | 'openrouter' | 'moonshot' | 'zhipu' | 'minimax'
+export type BalanceKind = 'deepseek' | 'openrouter' | 'moonshot' | 'zhipu' | 'minimax' | 'alibaba'
 
 /**
  * Everything the host needs to fetch one provider's balance. `fallbackToEnv`
@@ -115,10 +117,96 @@ const PROVIDER_SPECS: Record<BalanceKind, ProviderSpec> = {
     fallbackToEnv: true,
     authScheme: 'bearer',
   },
+  // Alibaba Cloud Model Studio (Token Plan) has no balance endpoint for model
+  // API keys: the quota gateway only accepts console-login or AccessKey-derived
+  // tokens. The chip therefore needs no key at all — night-discount state is
+  // computed client-side, and real usage percentages come from the official
+  // `bl` CLI when the user has installed and logged into it (see
+  // {@link alibabaPlanFacts}). The spec entry exists so `kindOf` accepts the
+  // kind; its credential/endpoint fields are never consulted.
+  alibaba: {
+    apiKeyEnvs: ['DASHSCOPE_API_KEY', 'ALIBABA_API_KEY', 'BAILIAN_API_KEY'],
+    urls: [],
+    fallbackToEnv: true,
+    authScheme: 'bearer',
+  },
 }
 
 /** Upstream call timeout. */
 const UPSTREAM_TIMEOUT_MS = 10_000
+
+/** One hour in milliseconds (host-side countdown math for the mock reset). */
+const HOUR_MS_HOST = 3_600_000
+
+/** How long a `bl` quota reading stays fresh before the bridge re-runs it. */
+const BL_CACHE_MS = 5 * 60_000
+
+/** The official Model Studio CLI, when the user installed it (`npm i -g @modelstudio/cli`). */
+const BL_COMMAND = process.env.DSH_BALANCE_BL ?? 'bl'
+
+const execFileAsync = promisify(execFile)
+
+/** One cached `bl usage token-plan` reading, shared by every chip poll. */
+let blCache: { at: number; facts: Record<string, unknown> } | undefined
+
+/**
+ * Read the Token Plan usage windows through the official `bl` CLI — the only
+ * supported path to the console quota gateway, which rejects model API keys.
+ * The CLI owns its own login (`bl auth login --console` or `--open-api`), so no
+ * secret ever enters this plugin: we spawn `bl usage token-plan --output json`
+ * and relay the percentages and reset times it prints. Absent CLI, absent
+ * login, or any failure degrades to `{ source: 'none' }`, which the chip
+ * renders as its night-discount-only form. Readings cache for five minutes so
+ * the 60s chip poll does not spawn a process every tick.
+ * @returns the plan facts for the client renderer.
+ */
+async function alibabaPlanFacts(): Promise<Record<string, unknown>> {
+  const now = Date.now()
+  if (blCache !== undefined && now - blCache.at < BL_CACHE_MS) return blCache.facts
+  let facts: Record<string, unknown> = { plan: 'Token Plan', source: 'none' }
+  try {
+    // shell: true so Windows resolves bl.cmd; the argument list is fixed, so
+    // nothing user-supplied reaches the shell string.
+    const { stdout } = await execFileAsync(BL_COMMAND, ['usage', 'token-plan', '--output', 'json'], {
+      timeout: 20_000,
+      windowsHide: true,
+      shell: true,
+    })
+    const parsed: unknown = JSON.parse(stdout)
+    if (isRecord(parsed)) {
+      // The API reports per-window ratios (0..1) or percentages; normalize to
+      // percent-used and pick the shortest window, mirroring the CLI's order.
+      const windows: Array<{ hours: number; label: string; used?: number; reset?: number }> = []
+      for (const [field, value] of Object.entries(parsed)) {
+        const match = /^per(\d+)(Hour|Day|Week|Month)(Percentage|ResetTime)$/.exec(field)
+        if (match === null || typeof value !== 'number') continue
+        const hours = Number(match[1]) * ({ Hour: 1, Day: 24, Week: 168, Month: 720 } as Record<string, number>)[match[2]]
+        const label = `${match[1]}-${match[2].toLowerCase()}`
+        const window: { hours: number; label: string; used?: number; reset?: number } =
+          windows.find((entry) => entry.label === label) ?? { hours, label }
+        if (match[3] === 'Percentage') window.used = value <= 1 ? value * 100 : value
+        else window.reset = value
+        if (!windows.includes(window)) windows.push(window)
+      }
+      windows.sort((left, right) => left.hours - right.hours)
+      const primary = windows.find((window) => window.used !== undefined)
+      if (primary !== undefined) {
+        facts = {
+          plan: 'Token Plan',
+          source: 'bl',
+          usedPercent: Math.round((primary.used ?? 0) * 100) / 100,
+          windowLabel: primary.label,
+          resetAt: primary.reset,
+          windows: windows.map((window) => ({ label: window.label, usedPercent: window.used, resetAt: window.reset })),
+        }
+      }
+    }
+  } catch {
+    // No CLI, no login, timeout, or malformed output: night-discount-only chip.
+  }
+  blCache = { at: now, facts }
+  return facts
+}
 
 /**
  * Dev-only canned upstream bodies for each provider kind, used when mock mode is
@@ -132,6 +220,7 @@ const MOCK_BODY: Record<BalanceKind, unknown> = {
   moonshot: { data: { available_balance: 49.59, voucher_balance: 46.59, cash_balance: 3.0 } },
   zhipu: { data: { balance: 142.5, availableBalance: 132.5, currency: 'CNY' } },
   minimax: { base_resp: { status_code: 0 }, model_remains: [{ current_interval_remaining_count: 88, current_interval_total_count: 100, current_subscribe_title: 'Pro' }] },
+  alibaba: { plan: 'Token Plan', source: 'mock', usedPercent: 4.22, windowLabel: 'monthly' },
 }
 
 /**
@@ -205,7 +294,17 @@ async function handleBalance(ctx: Context, req: IncomingMessage, res: ServerResp
   const kind = kindOf(req)
   const spec = PROVIDER_SPECS[kind]
   if (mockEnabled(req)) {
-    json(res, 200, { ok: true, provider: kind, balance: unwrapBalance(kind, MOCK_BODY[kind]) })
+    const mock = kind === 'alibaba'
+      ? { ...(MOCK_BODY.alibaba as Record<string, unknown>), resetAt: Date.now() + 30 * HOUR_MS_HOST }
+      : unwrapBalance(kind, MOCK_BODY[kind])
+    json(res, 200, { ok: true, provider: kind, balance: mock })
+    return
+  }
+  if (kind === 'alibaba') {
+    // No credential and no upstream call: the night-discount window is public
+    // pricing knowledge the client computes itself, and the optional usage
+    // percentage comes from the user's own logged-in `bl` CLI.
+    json(res, 200, { ok: true, provider: kind, balance: await alibabaPlanFacts() })
     return
   }
   const apiKey = await resolveApiKey(ctx, spec)

@@ -82,3 +82,19 @@ test('bare catalog routes and the DeepSeek fallback are unchanged', () => {
   assert.equal(kindForProvider('some-custom-route'), 'deepseek')
   assert.equal(kindForProvider('modlens-some-custom-route'), 'deepseek')
 })
+
+test('Alibaba Cloud Model Studio routes and Qwen models resolve to alibaba', () => {
+  const kindForProvider = loadMapping(readFileSync(BUNDLE, 'utf8'))
+  for (const route of ['alibaba-cloud', 'alibaba', 'dashscope', 'bailian', 'qwen', 'model-studio']) {
+    assert.equal(kindForProvider(route), 'alibaba')
+  }
+  assert.equal(kindForProvider('modlens-alibaba-cloud'), 'alibaba')
+  // Custom openai-compat channels carry arbitrary ids; Qwen models only exist
+  // on Model Studio, so the model name identifies the provider.
+  assert.equal(kindForProvider('my-relay', 'qwen3.8-max'), 'alibaba')
+  assert.equal(kindForProvider('my-relay', 'Qwen4-Max-Preview'), 'alibaba')
+  // DeepSeek models on a custom route stay DeepSeek: the id, not the model,
+  // decides there, because DeepSeek sells the same models directly.
+  assert.equal(kindForProvider('my-relay', 'deepseek-v4-pro'), 'deepseek')
+  assert.equal(kindForProvider('deepseek', 'qwen3.8-max'), 'deepseek')
+})

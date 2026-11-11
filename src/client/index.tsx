@@ -64,7 +64,7 @@ const REFRESH_INTERVAL_MS = 60_000
 const BALANCE_ENDPOINT = '/plugins/balance'
 
 /** A provider whose balance the host can serve. */
-type BalanceKind = 'deepseek' | 'openrouter' | 'moonshot' | 'zhipu' | 'minimax'
+type BalanceKind = 'deepseek' | 'openrouter' | 'moonshot' | 'zhipu' | 'minimax' | 'alibaba'
 
 /**
  * The minimal model-directory face the chip reads the active session's
@@ -73,7 +73,7 @@ type BalanceKind = 'deepseek' | 'openrouter' | 'moonshot' | 'zhipu' | 'minimax'
  * `ModelDirectoryResolver` / `ModelDirectory` store, kept dependency-free.
  */
 interface ModelDirectoryStoreLike {
-  getSnapshot(): { current?: { provider?: string } | null }
+  getSnapshot(): { current?: { provider?: string; model?: string } | null }
   subscribe(fn: () => void): () => void
 }
 interface ModelDirectoryServiceLike {
@@ -121,6 +121,14 @@ interface BalanceResponse {
       plan_name?: string
       plan?: string
     }>
+    // Alibaba Cloud Model Studio shape (host-built, from the official bl CLI
+    // when logged in; `source: 'none'` means night-discount-only mode).
+    plan?: string
+    source?: string
+    usedPercent?: number
+    windowLabel?: string
+    resetAt?: number
+    windows?: Array<{ label?: string; usedPercent?: number; resetAt?: number }>
   }
 }
 
@@ -138,6 +146,16 @@ type DisplayState =
       detail: string
       /** DeepSeek only: whether the fetch landed inside a peak billing window. */
       peak?: boolean
+      /** Alibaba only: percent of the plan window's credits already used. */
+      usedPercent?: number
+      /** Alibaba only: the window the percentage belongs to (`1-month`, …). */
+      windowLabel?: string
+      /** Alibaba only: epoch ms when that window resets. */
+      resetAt?: number
+      /** Alibaba only: the active model's discount, in percent off. */
+      discount?: number
+      /** Alibaba only: whether the discount runs at night or all day. */
+      discountScope?: 'night' | 'always'
       dotColor: CSSProperties['background']
     }
   | { kind: 'error'; message: string }
@@ -166,12 +184,19 @@ function unwrapModlensProvider(provider: string): string {
  * pi-ai built-in catalog names; each regional (`-cn`) variant maps to the same
  * kind because the host tries the matching mirror endpoint for that key's site.
  */
-function kindForProvider(provider: string): BalanceKind {
+function kindForProvider(provider: string, model?: string): BalanceKind {
   const p = unwrapModlensProvider(provider)
   if (p === 'openrouter') return 'openrouter'
   if (p === 'moonshotai' || p === 'moonshotai-cn') return 'moonshot'
   if (p === 'zai' || p === 'zai-coding-cn' || p === 'zhipu') return 'zhipu'
   if (p === 'minimax' || p === 'minimax-cn') return 'minimax'
+  if (p === 'alibaba-cloud' || p === 'alibaba' || p === 'dashscope' || p === 'bailian' || p === 'qwen' || p === 'model-studio') return 'alibaba'
+  // A known provider id always wins over the model-name hint: DeepSeek sells
+  // Qwen-family names on its own platform too, and its balance is the point.
+  if (p === 'deepseek') return 'deepseek'
+  // Custom openai-compat channels aimed at Model Studio carry an arbitrary
+  // provider id; Qwen models only exist there, so the model name identifies them.
+  if (model !== undefined && model.toLowerCase().startsWith('qwen')) return 'alibaba'
   return 'deepseek'
 }
 
@@ -237,11 +262,29 @@ function kindForSession(
 ): BalanceKind {
   if (sessionId === undefined || modelDirectories === undefined) return 'deepseek'
   try {
-    const provider = modelDirectories.directoryFor(sessionId).store.getSnapshot().current?.provider
-    return provider === undefined ? 'deepseek' : kindForProvider(provider)
+    const current = modelDirectories.directoryFor(sessionId).store.getSnapshot().current
+    const provider = current?.provider
+    return provider === undefined ? 'deepseek' : kindForProvider(provider, current?.model)
   } catch {
     // e.g. an addressed subagent session with no directory, or a scope not yet bound.
     return 'deepseek'
+  }
+}
+
+/**
+ * The active session's model id, when the directory has resolved one. Used to
+ * pick the model-specific Token Plan discount; absent directories and lookup
+ * failures yield undefined, which renders the plan without a promo pill.
+ */
+function modelForSession(
+  modelDirectories: ModelDirectoryServiceLike | undefined,
+  sessionId: SessionId | undefined,
+): string | undefined {
+  if (sessionId === undefined || modelDirectories === undefined) return undefined
+  try {
+    return modelDirectories.directoryFor(sessionId).store.getSnapshot().current?.model
+  } catch {
+    return undefined
   }
 }
 
@@ -317,6 +360,11 @@ export function formatCountdown(ms: number): string {
   if (totalMinutes < 1) return 'under 1m'
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24)
+    const rest = hours % 24
+    return rest === 0 ? `${days}d` : `${days}d ${rest}h`
+  }
   if (hours === 0) return `${minutes}m`
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`
 }
@@ -372,6 +420,70 @@ export function peakWindowsLocalLabel(now: Date = new Date()): string {
   const window1 = `${localClock(at(0, 1))} – ${localClock(at(0, 4))}`
   const window2 = `${localClock(at(0, 6))} – ${localClock(at(0, 10))}`
   return `Peak ${days} ${window1} & ${window2} (${localZoneLabel()})`
+}
+
+/**
+ * Alibaba Cloud Model Studio night discount (official Token Plan terms and the
+ * Model Studio CLI blog): every day 22:00–08:00 **Beijing time (UTC+8)**, which
+ * is 14:00–24:00 UTC — a single daily window, weekends included. Supported
+ * models consume fewer credits inside it; the per-model rates live in
+ * {@link alibabaDiscountForModel}.
+ * @param now - the instant to classify (defaults to now).
+ * @returns whether the instant falls inside the night discount window.
+ */
+export function isAlibabaNight(now: Date = new Date()): boolean {
+  return now.getUTCHours() >= 14
+}
+
+/**
+ * The next night/day boundary strictly after `now`, with the state it leads
+ * into. The window repeats daily, so a boundary always exists within two days.
+ * @param now - the instant to search from (defaults to now).
+ * @returns the boundary instant and whether it starts (`'night'`) or ends
+ *   (`'day'`) the discount window.
+ */
+export function nextAlibabaTransition(now: Date = new Date()): { readonly at: Date; readonly to: 'night' | 'day' } {
+  const t0 = now.getTime()
+  for (let dayOffset = 0; dayOffset <= 2; dayOffset += 1) {
+    const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + dayOffset)
+    const startAt = dayStart + 14 * HOUR_MS
+    if (startAt > t0) return { at: new Date(startAt), to: 'night' }
+    const endAt = dayStart + 24 * HOUR_MS
+    if (endAt > t0) return { at: new Date(endAt), to: 'day' }
+  }
+  return { at: new Date(t0), to: 'day' } // unreachable: a daily edge is always within 2 days
+}
+
+/**
+ * The night discount window in the viewer's own system time with AM/PM tags
+ * and a zone label — e.g. `Nights 7:30 PM – 5:30 AM (GMT+5:30)`. The window is
+ * a fixed UTC interval, so a representative day of the current week keeps
+ * DST-shifted zones honest.
+ * @param now - the day to describe (defaults to now).
+ * @returns the local-time window label.
+ */
+export function alibabaNightLocalLabel(now: Date = new Date()): string {
+  const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const start = new Date(dayStart + 14 * HOUR_MS)
+  const end = new Date(dayStart + 24 * HOUR_MS)
+  return `Nights ${localClock(start)} – ${localClock(end)} (${localZoneLabel()})`
+}
+
+/**
+ * The active model's Token Plan discount, in percent off, and whether it runs
+ * only at night or all day. Qwen models take 40% off at night, DeepSeek models
+ * served through the plan take 50% off at night, and the qwen4-max-preview
+ * launch promo is 80% off around the clock. Models outside the promo list
+ * (GLM, Wan, …) get no discount and therefore no countdown pill.
+ * @param model - the active model id, when the directory has resolved one.
+ * @returns the discount, or undefined when the model is not in the promo.
+ */
+export function alibabaDiscountForModel(model?: string): { readonly percent: number; readonly scope: 'night' | 'always' } | undefined {
+  const m = (model ?? '').toLowerCase()
+  if (m.startsWith('qwen4-max-preview')) return { percent: 80, scope: 'always' }
+  if (m.startsWith('deepseek')) return { percent: 50, scope: 'night' }
+  if (m.startsWith('qwen')) return { percent: 40, scope: 'night' }
+  return undefined
 }
 
 /**
@@ -548,13 +660,50 @@ function renderMiniMax(data: BalanceResponse): DisplayState {
   return { kind: 'error', message: 'No MiniMax remaining value returned' }
 }
 
+/**
+ * Shape the Alibaba Cloud Model Studio response into the chip display state.
+ * The host serves plan facts, not a currency balance: with the official `bl`
+ * CLI logged in, the percent of the current window's credits already used and
+ * its reset time; without it, the chip runs in night-discount-only mode and
+ * says where the credits live. The discount pill comes from the active model.
+ */
+function renderAlibaba(data: BalanceResponse, model?: string): DisplayState {
+  const info = data.balance
+  const plan = typeof info?.plan === 'string' ? info.plan : 'Token Plan'
+  const used = typeof info?.usedPercent === 'number' ? info.usedPercent : undefined
+  const discount = alibabaDiscountForModel(model)
+  const resetIn = typeof info?.resetAt === 'number' && info.resetAt > Date.now()
+    ? ` · resets in ${formatCountdown(info.resetAt - Date.now())}`
+    : ''
+  const detail = used !== undefined
+    ? `${used.toFixed(2)}% of ${info?.windowLabel ?? 'plan'} credits used${resetIn}`
+    : 'Credits live in the Model Studio console'
+  return {
+    kind: 'ok',
+    provider: 'alibaba',
+    symbol: '',
+    total: used !== undefined ? `${used.toFixed(2)}%` : plan,
+    heading: plan,
+    detail,
+    usedPercent: used,
+    windowLabel: info?.windowLabel,
+    resetAt: info?.resetAt,
+    discount: discount?.percent,
+    discountScope: discount?.scope,
+    dotColor: used === undefined || used < 90
+      ? 'var(--dsw-alias-state-success-primary)'
+      : 'var(--dsw-alias-state-error-primary)',
+  }
+}
+
 /** Choose the provider-aware display state for a host response. */
-function displayState(data: BalanceResponse): DisplayState {
+function displayState(data: BalanceResponse, model?: string): DisplayState {
   switch (data.provider ?? 'deepseek') {
     case 'openrouter': return renderOpenRouter(data)
     case 'moonshot': return renderMoonshot(data)
     case 'zhipu': return renderZhipu(data)
     case 'minimax': return renderMiniMax(data)
+    case 'alibaba': return renderAlibaba(data, model)
     case 'deepseek':
     default: return renderDeepSeek(data)
   }
@@ -578,6 +727,12 @@ const ZHIPU_LOGO_PATH = 'M12.105 2L9.927 4.953H.653L2.83 2h9.276zM23.254 19.048L
 /** MiniMax brand mark, LobeHub 24×24 glyph — fills `currentColor`. */
 const MINIMAX_LOGO_PATH = 'M16.278 2c1.156 0 2.093.927 2.093 2.07v12.501a.74.74 0 00.744.709.74.74 0 00.743-.709V9.099a2.06 2.06 0 012.071-2.049A2.06 2.06 0 0124 9.1v6.561a.649.649 0 01-.652.645.649.649 0 01-.653-.645V9.1a.762.762 0 00-.766-.758.762.762 0 00-.766.758v7.472a2.037 2.037 0 01-2.048 2.026 2.037 2.037 0 01-2.048-2.026v-12.5a.785.785 0 00-.788-.753.785.785 0 00-.789.752l-.001 15.904A2.037 2.037 0 0113.441 22a2.037 2.037 0 01-2.048-2.026V18.04c0-.356.292-.645.652-.645.36 0 .652.289.652.645v1.934c0 .263.142.506.372.638.23.131.514.131.744 0a.734.734 0 00.372-.638V4.07c0-1.143.937-2.07 2.093-2.07zm-5.674 0c1.156 0 2.093.927 2.093 2.07v11.523a.648.648 0 01-.652.645.648.648 0 01-.652-.645V4.07a.785.785 0 00-.789-.78.785.785 0 00-.789.78v14.013a2.06 2.06 0 01-2.07 2.048 2.06 2.06 0 01-2.071-2.048V9.1a.762.762 0 00-.766-.758.762.762 0 00-.766.758v3.8a2.06 2.06 0 01-2.071 2.049A2.06 2.06 0 010 12.9v-1.378c0-.357.292-.646.652-.646.36 0 .653.29.653.646V12.9c0 .418.343.757.766.757s.766-.339.766-.757V9.099a2.06 2.06 0 012.07-2.048 2.06 2.06 0 012.071 2.048v8.984c0 .419.343.758.767.758.423 0 .766-.339.766-.758V4.07c0-1.143.937-2.07 2.093-2.07z'
 
+/** Alibaba Cloud brand mark (bracket-and-bar), LobeHub 24×24 glyph — two paths, both fill `currentColor`. */
+const ALIBABA_LOGO_PATHS = [
+  'M14.752 4.64h5.274C22.242 4.64 24 6.475 24 8.691V15.8a3.947 3.947 0 01-3.974 3.975h-5.274l1.299-1.835 3.822-1.222c.688-.23 1.146-.918 1.146-1.605v-5.81c0-.687-.458-1.375-1.146-1.605L16.05 6.475l-1.3-1.835zM2.98 15.111c0 .688.46 1.376 1.147 1.606l3.822 1.146 1.3 1.835H3.974A3.947 3.947 0 010 15.723V8.69c0-2.216 1.758-4.05 3.975-4.05h5.273L7.95 6.474 4.127 7.697c-.688.23-1.146.918-1.146 1.606v5.808z',
+  'M16.051 11.213H8.025v1.835h8.026v-1.835z',
+]
+
 /**
  * One or more LobeHub 24×24 brand-mark paths per provider, all filled with
  * `currentColor` so they inherit the chip's muted label color across
@@ -590,6 +745,7 @@ const PROVIDER_LOGO_PATHS: Record<BalanceKind, string[]> = {
   moonshot: MOONSHOT_LOGO_PATHS,
   zhipu: [ZHIPU_LOGO_PATH],
   minimax: [MINIMAX_LOGO_PATH],
+  alibaba: ALIBABA_LOGO_PATHS,
 }
 
 /**
@@ -761,6 +917,37 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
       urgent: countdown !== undefined && ms <= URGENT_MS,
     })
     lines.push({ text: peakWindowsLocalLabel(now), muted: true })
+  } else if (state.provider === 'alibaba') {
+    const night = isAlibabaNight(now)
+    const { at, to } = nextAlibabaTransition(now)
+    const ms = at.getTime() - now.getTime()
+    const scope = state.discountScope
+    const countdown = scope === 'night'
+      ? night
+        ? `day in ${formatCountdown(ms)}`
+        : to === 'night' && ms <= HOUR_MS ? `−${state.discount}% in ${formatCountdown(ms)}` : undefined
+      : undefined
+    const status = state.discount === undefined
+      ? ''
+      : scope === 'always'
+        ? ` · −${state.discount}% limited-time`
+        : night ? ` · Night −${state.discount}% now` : ` · Nights −${state.discount}%`
+    lines.push({
+      text: `${state.heading}${status}`,
+      countdown,
+      peak: countdown !== undefined && !night,
+      countdownColor: night ? TEAL_INK : 'var(--dsw-alias-state-error-primary)',
+      urgent: countdown !== undefined && ms <= URGENT_MS,
+    })
+    if (scope !== 'always') lines.push({ text: alibabaNightLocalLabel(now), muted: true })
+    if (state.usedPercent !== undefined) {
+      const reset = typeof state.resetAt === 'number' && state.resetAt > now.getTime()
+        ? ` · resets in ${formatCountdown(state.resetAt - now.getTime())}`
+        : ''
+      lines.push({ text: `${state.usedPercent.toFixed(2)}% of ${state.windowLabel ?? 'plan'} credits used${reset}`, muted: true })
+    } else {
+      lines.push({ text: 'Usage % appears once the bl CLI is installed and logged in', muted: true })
+    }
   } else {
     lines.push({ text: state.heading })
   }
@@ -799,6 +986,38 @@ export function chipTimer(now: Date = new Date()): ChipTimer | undefined {
     urgent: ms <= URGENT_MS,
     color: peak ? TEAL_INK : 'var(--dsw-alias-state-error-primary)',
   }
+}
+
+/**
+ * The Alibaba chip's inline pill: the model's night discount while the window
+ * runs (teal, counting down to daylight), the same discount in red through the
+ * last hour before the window opens, and a steady teal `−80%` for all-day
+ * launch promos. Models outside the promo list stay bare. Mirrors
+ * {@link chipTimer}'s relief/warning ink rule with the window inverted.
+ * @param now - the render instant (defaults to now).
+ * @param discount - the active model's percent off, when it has one.
+ * @param scope - whether the discount runs at night or all day.
+ * @returns the timer, or undefined when there is nothing to count.
+ */
+export function alibabaChipTimer(
+  now: Date = new Date(),
+  discount?: number,
+  scope?: 'night' | 'always',
+): ChipTimer | undefined {
+  if (discount === undefined) return undefined
+  if (scope === 'always') {
+    return { text: `−${discount}%`, peak: false, urgent: false, color: TEAL_INK }
+  }
+  const night = isAlibabaNight(now)
+  const { at, to } = nextAlibabaTransition(now)
+  const ms = at.getTime() - now.getTime()
+  if (night) {
+    return { text: `−${discount}% · ${formatCountdown(ms)}`, peak: false, urgent: ms <= URGENT_MS, color: TEAL_INK }
+  }
+  if (to === 'night' && ms <= HOUR_MS) {
+    return { text: `−${discount}% in ${formatCountdown(ms)}`, peak: true, urgent: ms <= URGENT_MS, color: 'var(--dsw-alias-state-error-primary)' }
+  }
+  return undefined
 }
 
 /**
@@ -1150,10 +1369,12 @@ export function BalanceChip({
   const refresh = useCallback(async () => {
     setState({ kind: 'loading' })
     try {
-      const kind = kindForSession(getModelDirectories(), activeSession)
+      const directories = getModelDirectories()
+      const kind = kindForSession(directories, activeSession)
+      const model = modelForSession(directories, activeSession)
       const res = await fetch(`${BALANCE_ENDPOINT}?kind=${kind}`, { headers: { accept: 'application/json' } })
       const data = (await res.json()) as BalanceResponse
-      setState(data.ok ? displayState(data) : { kind: 'error', message: data.message ?? data.error ?? 'unavailable' })
+      setState(data.ok ? displayState(data, model) : { kind: 'error', message: data.message ?? data.error ?? 'unavailable' })
     } catch {
       setState({ kind: 'error', message: 'Failed to load' })
     }
@@ -1276,7 +1497,14 @@ export function BalanceChip({
 
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll
   // repaints it). Undefined for every other provider and quiet off-peak.
-  const timer = state.kind === 'ok' && state.provider === 'deepseek' ? chipTimer() : undefined
+  // Alibaba carries its own night-discount pill on the same seat.
+  const timer = state.kind === 'ok'
+    ? state.provider === 'deepseek'
+      ? chipTimer()
+      : state.provider === 'alibaba'
+        ? alibabaChipTimer(new Date(), state.discount, state.discountScope)
+        : undefined
+    : undefined
 
   return (
     <div ref={anchorRef}>
