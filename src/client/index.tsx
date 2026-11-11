@@ -38,6 +38,8 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { createHoverMachine } from './hover'
+import type { HoverMachine } from './hover'
 import type { CSSProperties, FocusEvent } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -1053,20 +1055,6 @@ function alibabaAccentInk(state: Extract<DisplayState, { kind: 'ok' }>): CSSProp
 }
 
 /**
- * Whether a pointer position falls inside a viewport rect. The popover's
- * dismissal watches pointer positions rather than mouseleave boundary
- * events: seat repaints in the desktop webview can swallow the boundary
- * event, stranding the panel open, while pointermove always arrives.
- */
-export function pointerInsideRect(
-  x: number,
-  y: number,
-  rect: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number },
-): boolean {
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
-}
-
-/**
  * The horizontal lane the popover may occupy. It floats `position: fixed`
  * above the app, so it can extend past the conversation column into empty
  * chrome — the chip sits at the column's right edge, so clamping to the
@@ -1526,93 +1514,96 @@ export function BalanceChip({
   }, [showTip])
 
   /**
-   * The popover's whole open/close state machine, driven by polling the chip's
-   * CSS `:hover` state.
+   * The popover's open/close state, run by the pure machine in `hover.ts`.
    *
-   * The desktop shell stops pointer/mouse event propagation below document
-   * level, so React's delegated `onMouseLeave` never fires and even a
-   * capture-phase `pointermove` watcher on `document` can go silent — three
-   * event-based fixes in a row failed for that reason. `:hover` is browser
-   * hit-testing state: it flips no matter what JavaScript does with the
-   * events, so polling it is the one signal the shell cannot starve.
-   *
-   * Opening requires a genuine false→true transition plus one more tick, so a
-   * chip that mounts (new session) or flies (FLIP) under a resting pointer
-   * never opens the panel by itself. Closing is immediate on the first tick
-   * outside, and the card takes no pointer events, so no grace is needed.
+   * Pointer positions come from `window` capture-phase listeners, the first
+   * stop of every event, before any shell handler can stop it. Opening needs
+   * a genuine move into the chip plus a short dwell. Closing needs only one
+   * witness: the pointer outside the chip's rect, `:hover` false on two ticks,
+   * the pointer leaving the window, or the window losing focus. Every close
+   * disarms the dwell, so a stale or wobbling signal can close the panel but
+   * never reopen it. The rect and `:hover` are read from the chip element
+   * itself, not the block-level wrapper, which can be wider than the chip.
    */
+  const machineRef = useRef<HoverMachine | null>(null)
   useEffect(() => {
     const anchor = anchorRef.current
     if (anchor === null) return
-    // A chip that is already under the pointer when it mounts (new session,
-    // FLIP landing) starts "hovered" with no enter to count, so it cannot
-    // open by itself: only a false→true transition while mounted arms it.
-    let wasOver = anchor.matches(':hover')
-    let armed = false
-    let enterTicks = 0
-    let missTicks = 0
-    let heldTicks = 0
-    let closedAgo = Number.MAX_SAFE_INTEGER
-    let lastEl: HTMLElement = anchor
+    const chipOf = (el: HTMLElement | null): Element | null => el?.firstElementChild ?? el
+    const hoveredNow = (): boolean | undefined => {
+      const chip = chipOf(anchorRef.current)
+      return chip === null ? undefined : chip.matches(':hover')
+    }
+    const machine = createHoverMachine(
+      () => chipOf(anchorRef.current)?.getBoundingClientRect() ?? null,
+      showTip,
+      hideTip,
+      hoveredNow(),
+    )
+    machineRef.current = machine
+    let lastChip = chipOf(anchor)
+    let lastX = Number.NaN
+    let lastY = Number.NaN
+    const onMove = (event: MouseEvent) => {
+      // A zero-delta move is the browser re-hit-testing after layout, not the
+      // user: it may close the panel, but it cannot open it.
+      const moved = event.movementX !== 0 || event.movementY !== 0
+        || (!Number.isNaN(lastX) && (event.clientX !== lastX || event.clientY !== lastY))
+      lastX = event.clientX
+      lastY = event.clientY
+      machine.pointer(event.clientX, event.clientY, performance.now(), moved)
+    }
+    const onOver = (event: MouseEvent) => {
+      machine.pointer(event.clientX, event.clientY, performance.now(), false)
+    }
+    const onGone = () => {
+      lastX = Number.NaN
+      lastY = Number.NaN
+      machine.pointerGone(performance.now())
+    }
+    const onDocOut = (event: MouseEvent) => { if (event.relatedTarget === null) onGone() }
+    const onVisibility = () => { if (document.visibilityState !== 'visible') onGone() }
+    const capture = { capture: true, passive: true } as const
+    window.addEventListener('pointermove', onMove, capture)
+    window.addEventListener('mousemove', onMove, capture)
+    window.addEventListener('mouseover', onOver, capture)
+    window.addEventListener('mouseout', onDocOut, capture)
+    document.documentElement.addEventListener('mouseleave', onGone)
+    window.addEventListener('blur', onGone)
+    document.addEventListener('visibilitychange', onVisibility)
     const timer = window.setInterval(() => {
-      const el = anchorRef.current
-      if (el === null) return
-      if (el !== lastEl) {
-        // The seat re-mounted (hero↔dock, session switch): re-seed from the
-        // new element so a stale transition cannot open or strand the panel.
-        lastEl = el
-        wasOver = el.matches(':hover')
-        armed = false
-        enterTicks = 0
-        missTicks = 0
+      const chip = chipOf(anchorRef.current)
+      if (chip !== lastChip) {
+        // The chip re-rendered (loading ↔ ready) or the seat re-mounted: start
+        // clean so a stale state cannot open or strand the panel.
+        lastChip = chip
+        machine.reset(performance.now(), hoveredNow())
+        return
       }
-      const over = el.matches(':hover')
-      closedAgo += 1
-      if (over) {
-        missTicks = 0
-        if (!wasOver) {
-          // A fresh enter: arm and restart the dwell count.
-          armed = true
-          enterTicks = 0
-        }
-        if (armed) enterTicks += 1
-        if (armed && enterTicks >= 2 && !tipOpenRef.current && closedAgo > 6) {
-          showTip()
-          heldTicks = 0
-        }
-      } else {
-        armed = false
-        enterTicks = 0
-        missTicks += 1
-        // Two consecutive misses before closing, so an edge wobble does not
-        // flicker the panel shut and open again.
-        if (tipOpenRef.current && missTicks >= 2) {
-          hideTip()
-          closedAgo = 0
-          heldTicks = 0
-        }
-      }
-      // Hard stop: a panel left open (a stale :hover, a seat that stopped
-      // reporting) dismisses itself instead of needing an outside click. It
-      // also disarms, so the same resting hover cannot reopen it: ending the
-      // peek needs a fresh leave-and-enter.
-      if (tipOpenRef.current) {
-        heldTicks += 1
-        if (heldTicks > 60) {
-          hideTip()
-          closedAgo = 0
-          heldTicks = 0
-          armed = false
-          enterTicks = 0
-        }
-      }
-      wasOver = over
-    }, 120)
-    return () => { window.clearInterval(timer) }
+      machine.tick(performance.now(), hoveredNow())
+    }, 100)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('pointermove', onMove, capture)
+      window.removeEventListener('mousemove', onMove, capture)
+      window.removeEventListener('mouseover', onOver, capture)
+      window.removeEventListener('mouseout', onDocOut, capture)
+      document.documentElement.removeEventListener('mouseleave', onGone)
+      window.removeEventListener('blur', onGone)
+      document.removeEventListener('visibilitychange', onVisibility)
+      machine.dismiss(performance.now())
+      if (machineRef.current === machine) machineRef.current = null
+    }
     // `variant`/`blank` re-run this when the seat becomes visible: a hero
     // instance whose first render is hidden has no anchor yet and would
-    // otherwise never start polling for the rest of its life.
+    // otherwise never start tracking for the rest of its life.
   }, [showTip, hideTip, variant, blank])
+  /** Close from outside the machine (Escape, outside press, seat swap) and keep it in sync. */
+  const dismissTip = useCallback(() => {
+    const machine = machineRef.current
+    if (machine !== null) machine.dismiss(performance.now())
+    hideTip()
+  }, [hideTip])
 
   // While the popover is open, a window resize or any layout mutation — a
   // side panel opening, the sidebar collapsing — re-measures the seat and
@@ -1650,11 +1641,11 @@ export function BalanceChip({
   // can never strand it open.
   useEffect(() => {
     if (tip === null) return
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') hideTip() }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') dismissTip() }
     const onDown = (event: PointerEvent) => {
       const anchor = anchorRef.current
       const target = event.target
-      if (anchor !== null && target instanceof Node && !anchor.contains(target)) hideTip()
+      if (anchor !== null && target instanceof Node && !anchor.contains(target)) dismissTip()
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('pointerdown', onDown)
@@ -1662,11 +1653,11 @@ export function BalanceChip({
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('pointerdown', onDown)
     }
-  }, [tip !== null, hideTip])
+  }, [tip !== null, dismissTip])
 
   // A session switch or the hero/dock seat swap closes any open popover: the
   // new seat starts clean instead of inheriting a stranded panel.
-  useEffect(() => { hideTip() }, [activeSession, blank, hideTip])
+  useEffect(() => { dismissTip() }, [activeSession, blank, dismissTip])
 
   // The hero seat belongs to the blank session: the moment the first prompt
   // is sent the shell swaps to the composer view, the dock instance takes
@@ -1693,9 +1684,9 @@ export function BalanceChip({
           style={chipStyle}
           aria-busy="true"
           aria-label="Loading balance"
-          onMouseLeave={hideTip}
+          onMouseLeave={dismissTip}
           onFocus={focusTip}
-          onBlur={hideTip}
+          onBlur={dismissTip}
         >
           <span style={amountStyle}>Loading…</span>
         </div>
@@ -1704,9 +1695,9 @@ export function BalanceChip({
           type="button"
           style={chipStyle}
           aria-label={`Balance unavailable — ${state.message}`}
-          onMouseLeave={hideTip}
+          onMouseLeave={dismissTip}
           onFocus={focusTip}
-          onBlur={hideTip}
+          onBlur={dismissTip}
           onClick={() => { void refresh() }}
         >
           <span style={amountStyle}>Balance —</span>
@@ -1716,9 +1707,9 @@ export function BalanceChip({
           type="button"
           style={chipStyle}
           aria-label={`${state.heading} ${state.symbol}${state.total}`}
-          onMouseLeave={hideTip}
+          onMouseLeave={dismissTip}
           onFocus={focusTip}
-          onBlur={hideTip}
+          onBlur={dismissTip}
           onClick={() => { void refresh() }}
         >
           <ProviderLogo provider={state.provider} />

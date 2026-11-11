@@ -17,25 +17,26 @@ and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/
   mounting (or the FLIP flight sweeping the chip) under a resting pointer can
   no longer trigger a phantom hover; focus opens only for keyboard focus
   (`:focus-visible`), not the shell's programmatic autofocus.
-- **Moving the pointer away always closes the popover**, in the hero seat too.
-  The panel's open/close state is now driven by polling the chip's CSS
-  `:hover` state: the shell stops pointer/mouse propagation below document
-  level, so React's delegated `onMouseLeave` and even a capture-phase
-  `pointermove` watcher went silent and the panel stranded open. `:hover` is
-  browser hit-testing state, so no handler can starve it.
-  - Opening needs a genuine false→true transition plus one confirming tick, so
-    a chip that mounts or flies under a resting pointer starts "hovered" with
-    no enter to count and never opens by itself.
-  - Closing tolerates one missed tick (≈120 ms) before hiding, so an edge
-    wobble no longer flickers the panel shut and open again; after a close a
-    short cooldown blocks an immediate reopen.
-  - An open panel hard-stops by itself after ~7 s, and that dismissal disarms,
-    so no stale hover can strand it and no outside click is needed. A fresh
-    leave-and-enter is required to see it again.
-  - The poll re-seeds when the seat re-mounts and starts when a hidden seat
-    becomes visible.
-  Seven behavioural tests drive the real interval callback out of the built
-  bundle.
+- **Moving the pointer away always closes the popover, and it no longer
+  flickers**, in the hero seat too. A small state machine (`hover.ts`) now
+  runs the panel. Every earlier fix trusted one signal at a time
+  (`onMouseLeave`, then a document `pointermove` watcher, then `:hover`
+  polling), and when that one signal went stale the panel either stranded open
+  or flapped shut and open again.
+  - Opening needs positive evidence: the pointer has to *move* into the chip
+    and rest there for 120 ms. A chip that mounts or flies under a resting
+    pointer never opens by itself.
+  - Closing needs only one witness: the pointer position falls outside the
+    chip, `:hover` reads false on two ticks, the pointer leaves the window, the
+    window loses focus, or the panel has been open for 15 s. Every close
+    disarms, so a stale or wobbling signal can close the panel but never reopen
+    it. Reopening needs a fresh move back in.
+  - Pointer positions come from `window` capture-phase listeners, the first
+    stop of every event. The rect and `:hover` are read from the chip itself,
+    not its block-level wrapper, which can be wider than the chip.
+  - If the shell delivers no pointer events at all, `:hover` transitions still
+    open and close the panel.
+  Fifteen behavioural tests drive the machine with a fake clock and rect.
 - **The popover can always be closed**: Escape and any pointer press outside
   the chip dismiss it, and a session switch or hero/dock seat swap closes it,
   so a missing boundary event can never strand it open until the first send.
