@@ -1,15 +1,16 @@
 // Behavioural test for the popover's hover state machine.
 //
 // The unit extracts the REAL effect body out of the built client bundle —
-// the `let wasOver/armed/ticks` declarations plus the `setInterval` call — and
-// runs it against a fake chip element with a captured callback, so the closure
-// state evolves exactly as it does in the browser. It proves the decisions,
-// not the shape of the source:
+// the counters plus the `setInterval` call — and runs it against a fake chip
+// with a captured callback, so the closure evolves exactly as in the browser.
+// It proves the decisions, not the shape of the source:
 //
 //   - a chip already hovered at mount (new session / FLIP landing) must NOT
-//     open the popover by itself   ← the regression that shipped once already;
+//     open the popover by itself             ← shipped once as a regression;
 //   - leave then re-enter opens it after two confirming ticks;
-//   - leaving while open closes it on the first tick;
+//   - leaving closes it after two misses, so an edge wobble cannot flicker;
+//   - a panel left open hard-stops on its own, with no outside click;
+//   - a re-entered pointer inside the cooldown cannot immediately reopen;
 //   - a re-mounted anchor re-seeds instead of trusting stale state.
 //
 // `lib/client.js` is the artifact the browser loads. Run `pnpm run build` first.
@@ -47,7 +48,7 @@ function driver(initialHovered) {
   const windowStub = { setInterval: (fn) => { captured = fn; return 1 }, clearInterval: () => {} }
   const run = new Function(
     'anchor', 'anchorRef', 'tipOpenRef', 'showTip', 'hideTip', 'window',
-    extractPoll(source()),
+    extractPoll(bundle),
   )
   run(el, anchorRef, tipOpenRef, showTip, hideTip, windowStub)
   return {
@@ -60,10 +61,10 @@ function driver(initialHovered) {
       el.hovered = hovered
       for (let i = 0; i < n; i += 1) captured()
     },
+    /** Run `n` ticks without changing the pointer. */
+    idle(n = 1) { for (let i = 0; i < n; i += 1) captured() },
   }
 }
-
-const source = () => bundle
 
 test('the poll body is present and extractable', () => {
   assert.match(bundle, /let wasOver/)
@@ -72,42 +73,58 @@ test('the poll body is present and extractable', () => {
 
 test('a chip hovered at mount never opens by itself (new-session phantom)', () => {
   const d = driver(true)
-  d.move(true, 10)
+  d.idle(30)
   assert.equal(d.calls.opened, 0, 'a resting pointer must not open the popover')
-  assert.equal(d.open, false)
 })
 
 test('leaving and re-entering opens after two confirming ticks', () => {
   const d = driver(true)
-  d.move(false, 2)          // pointer leaves: disarm
+  d.move(false, 8)                    // pointer leaves; cooldown burns down
   assert.equal(d.calls.opened, 0)
-  d.move(true, 1)           // re-enter: armed, tick 1
+  d.move(true, 1)                     // re-enter: armed, tick 1
   assert.equal(d.calls.opened, 0, 'the first tick must not open (dwell)')
-  d.move(true, 1)           // tick 2
+  d.move(true, 1)                     // tick 2
   assert.equal(d.calls.opened, 1, 'the second confirming tick opens')
   assert.equal(d.open, true)
 })
 
-test('leaving while open closes on the first tick', () => {
+test('leaving closes after two misses, so an edge wobble cannot flicker', () => {
   const d = driver(false)
-  d.move(true, 2)           // open
+  d.move(true, 8)
   assert.equal(d.open, true)
-  d.move(false, 1)          // pointer away
-  assert.equal(d.open, false, 'move-away must close immediately')
+  d.move(false, 1)                    // one miss: tolerated
+  assert.equal(d.open, true, 'a single miss must not close (no flicker)')
+  d.move(false, 1)                    // second miss: close
+  assert.equal(d.open, false, 'move-away closes')
   assert.equal(d.calls.closed, 1)
+})
+
+test('a panel left open hard-stops on its own, with no outside click', () => {
+  const d = driver(false)
+  d.move(true, 8)
+  assert.equal(d.open, true)
+  d.idle(70)                          // pointer parked on the chip, hover honest
+  assert.equal(d.open, false, 'the panel must not strand open')
+  assert.equal(d.calls.closed, 1)
+})
+
+test('the cooldown after a close blocks an immediate reopen', () => {
+  const d = driver(false)
+  d.move(true, 8)
+  d.move(false, 2)                    // close
+  const before = d.calls.opened
+  d.move(true, 2)                     // re-enter inside the cooldown
+  assert.equal(d.calls.opened, before, 'no reopen during the cooldown')
 })
 
 test('a re-mounted anchor re-seeds and cannot inherit a stale transition', () => {
   const d = driver(false)
-  d.move(true, 2)
+  d.move(true, 8)
   assert.equal(d.open, true)
-  // Seat swap: a fresh element appears already hovered.
-  d.anchorRef.current.hovered = false
-  d.move(false, 1)
+  d.move(false, 2)
   const fresh = { hovered: true, matches: () => fresh.hovered }
   d.anchorRef.current = fresh
-  const before = d.calls.opened
-  // One tick on the new element re-seeds; it must not open from the old state.
-  d.move(true, 1)
-  assert.ok(d.calls.opened - before <= 1)
+  d.move(true, 2)
+  // Seeded as already-hovered on the new element: no transition, no reopen.
+  assert.equal(d.open, false)
 })

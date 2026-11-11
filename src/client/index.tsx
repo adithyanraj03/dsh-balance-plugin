@@ -1549,7 +1549,10 @@ export function BalanceChip({
     // open by itself: only a false→true transition while mounted arms it.
     let wasOver = anchor.matches(':hover')
     let armed = false
-    let ticks = 0
+    let enterTicks = 0
+    let missTicks = 0
+    let heldTicks = 0
+    let closedAgo = Number.MAX_SAFE_INTEGER
     let lastEl: HTMLElement = anchor
     const timer = window.setInterval(() => {
       const el = anchorRef.current
@@ -1560,21 +1563,48 @@ export function BalanceChip({
         lastEl = el
         wasOver = el.matches(':hover')
         armed = false
-        ticks = 0
+        enterTicks = 0
+        missTicks = 0
       }
       const over = el.matches(':hover')
+      closedAgo += 1
       if (over) {
+        missTicks = 0
         if (!wasOver) {
           // A fresh enter: arm and restart the dwell count.
           armed = true
-          ticks = 0
+          enterTicks = 0
         }
-        if (armed) ticks += 1
-        if (armed && ticks >= 2 && !tipOpenRef.current) showTip()
+        if (armed) enterTicks += 1
+        if (armed && enterTicks >= 2 && !tipOpenRef.current && closedAgo > 6) {
+          showTip()
+          heldTicks = 0
+        }
       } else {
         armed = false
-        ticks = 0
-        if (tipOpenRef.current) hideTip()
+        enterTicks = 0
+        missTicks += 1
+        // Two consecutive misses before closing, so an edge wobble does not
+        // flicker the panel shut and open again.
+        if (tipOpenRef.current && missTicks >= 2) {
+          hideTip()
+          closedAgo = 0
+          heldTicks = 0
+        }
+      }
+      // Hard stop: a panel left open (a stale :hover, a seat that stopped
+      // reporting) dismisses itself instead of needing an outside click. It
+      // also disarms, so the same resting hover cannot reopen it: ending the
+      // peek needs a fresh leave-and-enter.
+      if (tipOpenRef.current) {
+        heldTicks += 1
+        if (heldTicks > 60) {
+          hideTip()
+          closedAgo = 0
+          heldTicks = 0
+          armed = false
+          enterTicks = 0
+        }
       }
       wasOver = over
     }, 120)
