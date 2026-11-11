@@ -66,7 +66,7 @@ Sits at the right end of the composer dock, after the context meter:
 
 Hovering opens the popover; clicking refreshes. The amount is never dropped for the label's sake, and the pill, dot and popover all paint with dsh's own `--dsw-*` theme variables, so they follow the active theme.
 
-![The chip and its hover popover](assets/chip-deepseek.png)
+![The chip and its hover popover in the composer dock](assets/popover-dock.png)
 
 ### The providers
 
@@ -79,18 +79,24 @@ Hovering opens the popover; clicking refreshes. The amount is never dropped for 
 | Zhipu / GLM (Z.ai) | account report (bigmodel / z.ai mirrors) | — |
 | MiniMax | `/v1/token_plan/remains` | — |
 
-The provider follows the session's model selection, including modlens vision wrappers and custom openai-compat channels aimed at Model Studio (Qwen model names identify those).
+The provider follows the session's model selection, including modlens vision wrappers and custom openai-compat channels aimed at Model Studio (Qwen model names identify those). Model Studio sessions wear the **Qwen knot** on the chip — the models being billed are Qwen-family, and the knot reads better at 14px than the Alibaba Cloud bracket.
 
 ### Alibaba usage percentages
 
 Model Studio's quota gateway accepts console-login or AccessKey-derived tokens only — never a model API key — so the chip reads your usage through the official CLI instead of storing any secret:
 
 ```sh
-npm install -g @modelstudio/cli
-bl auth login --console        # browser login; or --open-api with an AccessKey pair
+npm install -g bailian-cli
+bl auth login --console        # browser login; international accounts add --console-site international
 ```
 
 With `bl` installed and logged in, the chip shows percent used and the window reset countdown (`4.22% · resets in 1d 6h`); without it, the chip runs in night-discount-only mode and says where the credits live. Readings cache for five minutes.
+
+Design previews of the Alibaba chip and popover (rendered by `scripts/make-chip-preview.py`; a live session shows your own numbers):
+
+![Alibaba chip design preview](assets/chip-alibaba.png)
+
+![Alibaba popover design preview](assets/popover-alibaba.png)
 
 ## Configuration
 
@@ -117,6 +123,7 @@ pnpm run build                  # tsdown: host ESM + client CJS
 node scripts/verify-client.mjs  # bundle contract, slot registration, provider resolution
 node --test test/*.test.mjs     # 33 tests against the built bundle
 python scripts/make-banner.py   # regenerate the README banners (Pillow)
+python scripts/make-chip-preview.py  # regenerate the Alibaba design previews
 ```
 
 ## Troubleshooting

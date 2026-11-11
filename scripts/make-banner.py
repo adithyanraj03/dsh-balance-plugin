@@ -90,8 +90,8 @@ def banner(bg: tuple, ink: tuple, tag: tuple, pill: tuple, out: str):
     d.text((320, 225), "balance", font=ImageFont.truetype(FONT_BOLD, 110), fill=ink, anchor="ls")
     d.text((324, 272), "Balances & peak countdowns in your composer.",
            font=ImageFont.truetype(FONT_MONO, 18), fill=tag, anchor="ls")
-    card(base, Image.open(ASSETS / "providers.png"), 975, 22, 400, 235, 14)
-    card(base, Image.open(ASSETS / "sidebar-dark.png"), 865, 142, 420, 247, 12, angle=-2)
+    card(base, Image.open(ASSETS / "popover-close.png"), 975, 50, 400, 132, 12)
+    card(base, Image.open(ASSETS / "popover-dock.png"), 865, 165, 420, 164, 12, angle=-2)
     if STDOUT:
         buf = io.BytesIO()
         base.convert("RGB").save(buf, format="PNG")

@@ -66,7 +66,7 @@ https://github.com/adithyanraj03/dsh-balance-plugin
 
 悬停打开弹层；点击刷新。金额永远不会为标签让位；药丸、状态点与弹层全部使用 dsh 自己的 `--dsw-*` 主题变量绘制，跟随当前主题。
 
-![胶囊及其悬停弹层](assets/chip-deepseek.png)
+![composer dock 中的胶囊及其悬停弹层](assets/popover-dock.png)
 
 ### 服务商
 
@@ -79,18 +79,24 @@ https://github.com/adithyanraj03/dsh-balance-plugin
 | 智谱 / GLM（Z.ai） | 账户报告（bigmodel / z.ai 镜像） | — |
 | MiniMax | `/v1/token_plan/remains` | — |
 
-服务商跟随会话的模型选择，包括 modlens 视觉包装路由，以及指向百炼的自定义 openai-compat 通道（Qwen 模型名即可识别）。
+服务商跟随会话的模型选择，包括 modlens 视觉包装路由，以及指向百炼的自定义 openai-compat 通道（Qwen 模型名即可识别）。百炼会话的胶囊佩戴 **Qwen 结**标识——被计费的是 Qwen 系模型，且该标识在 14px 下比阿里云括号更清晰。
 
 ### 阿里云用量百分比
 
 百炼的配额网关只接受控制台登录或 AccessKey 换发的 token——绝不接受模型 API key——因此胶囊通过官方 CLI 读取用量，而不存储任何密钥：
 
 ```sh
-npm install -g @modelstudio/cli
-bl auth login --console        # 浏览器登录；或 --open-api 配 AccessKey
+npm install -g bailian-cli
+bl auth login --console        # 浏览器登录；国际站账号加 --console-site international
 ```
 
 `bl` 已安装并登录后，胶囊显示已用百分比与窗口重置倒计时（`4.22% · resets in 1d 6h`）；否则胶囊运行在仅夜间折扣模式，并说明额度在控制台查看。读数缓存五分钟。
+
+阿里云胶囊与弹层的设计预览（由 `scripts/make-chip-preview.py` 渲染；实际会话显示你自己的数字）：
+
+![阿里云胶囊设计预览](assets/chip-alibaba.png)
+
+![阿里云弹层设计预览](assets/popover-alibaba.png)
 
 ## 配置
 
@@ -117,6 +123,7 @@ pnpm run build                  # tsdown：宿主 ESM + 客户端 CJS
 node scripts/verify-client.mjs  # bundle 契约、slot 注册、服务商解析
 node --test test/*.test.mjs     # 33 个针对构建产物的测试
 python scripts/make-banner.py   # 重新生成 README 横幅（Pillow）
+python scripts/make-chip-preview.py  # 重新生成阿里云设计预览
 ```
 
 ## 故障排查

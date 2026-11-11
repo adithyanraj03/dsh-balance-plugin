@@ -8,6 +8,28 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.12.1] — 2026-11-11
+
+### Changed
+
+- The Alibaba chip wears the **Qwen knot** (LobeHub glyph) instead of the
+  Alibaba Cloud bracket: the models being billed are Qwen-family, and the knot
+  reads better at 14px.
+- README screenshots now show the current composer-dock layout
+  (`popover-dock.png`, `popover-close.png`); the pre-0.5.0 sidebar, footer and
+  provider-strip assets are removed and `screenshots.json` follows.
+- Alibaba design previews (`chip-alibaba.png`, `popover-alibaba.png`) rendered
+  by `scripts/make-chip-preview.py`, with the Qwen mark rasterized from the
+  same LobeHub path the chip uses.
+- The CLI install command is `npm install -g bailian-cli` — the published
+  package name — with `--console-site international` noted for intl accounts.
+
+### Fixed
+
+- The Alibaba popover no longer prints the usage sentence twice: the shared
+  breakdown line is skipped for Alibaba, and a per-model rate line
+  (`Qwen −40% · DeepSeek-on-plan −50% during nights`) takes its place.
+
 ## [0.12.0] — 2026-11-11
 
 ### Added

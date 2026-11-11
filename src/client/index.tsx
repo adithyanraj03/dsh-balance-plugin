@@ -727,11 +727,11 @@ const ZHIPU_LOGO_PATH = 'M12.105 2L9.927 4.953H.653L2.83 2h9.276zM23.254 19.048L
 /** MiniMax brand mark, LobeHub 24×24 glyph — fills `currentColor`. */
 const MINIMAX_LOGO_PATH = 'M16.278 2c1.156 0 2.093.927 2.093 2.07v12.501a.74.74 0 00.744.709.74.74 0 00.743-.709V9.099a2.06 2.06 0 012.071-2.049A2.06 2.06 0 0124 9.1v6.561a.649.649 0 01-.652.645.649.649 0 01-.653-.645V9.1a.762.762 0 00-.766-.758.762.762 0 00-.766.758v7.472a2.037 2.037 0 01-2.048 2.026 2.037 2.037 0 01-2.048-2.026v-12.5a.785.785 0 00-.788-.753.785.785 0 00-.789.752l-.001 15.904A2.037 2.037 0 0113.441 22a2.037 2.037 0 01-2.048-2.026V18.04c0-.356.292-.645.652-.645.36 0 .652.289.652.645v1.934c0 .263.142.506.372.638.23.131.514.131.744 0a.734.734 0 00.372-.638V4.07c0-1.143.937-2.07 2.093-2.07zm-5.674 0c1.156 0 2.093.927 2.093 2.07v11.523a.648.648 0 01-.652.645.648.648 0 01-.652-.645V4.07a.785.785 0 00-.789-.78.785.785 0 00-.789.78v14.013a2.06 2.06 0 01-2.07 2.048 2.06 2.06 0 01-2.071-2.048V9.1a.762.762 0 00-.766-.758.762.762 0 00-.766.758v3.8a2.06 2.06 0 01-2.071 2.049A2.06 2.06 0 010 12.9v-1.378c0-.357.292-.646.652-.646.36 0 .653.29.653.646V12.9c0 .418.343.757.766.757s.766-.339.766-.757V9.099a2.06 2.06 0 012.07-2.048 2.06 2.06 0 012.071 2.048v8.984c0 .419.343.758.767.758.423 0 .766-.339.766-.758V4.07c0-1.143.937-2.07 2.093-2.07z'
 
-/** Alibaba Cloud brand mark (bracket-and-bar), LobeHub 24×24 glyph — two paths, both fill `currentColor`. */
-const ALIBABA_LOGO_PATHS = [
-  'M14.752 4.64h5.274C22.242 4.64 24 6.475 24 8.691V15.8a3.947 3.947 0 01-3.974 3.975h-5.274l1.299-1.835 3.822-1.222c.688-.23 1.146-.918 1.146-1.605v-5.81c0-.687-.458-1.375-1.146-1.605L16.05 6.475l-1.3-1.835zM2.98 15.111c0 .688.46 1.376 1.147 1.606l3.822 1.146 1.3 1.835H3.974A3.947 3.947 0 010 15.723V8.69c0-2.216 1.758-4.05 3.975-4.05h5.273L7.95 6.474 4.127 7.697c-.688.23-1.146.918-1.146 1.606v5.808z',
-  'M16.051 11.213H8.025v1.835h8.026v-1.835z',
-]
+/** Qwen brand mark (the Model Studio knot), LobeHub 24×24 glyph — fills
+ * `currentColor`. Alibaba Cloud Model Studio sessions wear the Qwen mark: the
+ * models being billed are Qwen-family, and the knot reads better at 14px than
+ * the Alibaba Cloud bracket. */
+const QWEN_LOGO_PATH = 'M19.713 2.825h-5.907c0-.251-.066-.503-.196-.728L12.819.728A1.46 1.46 0 0 0 11.559 0h-1.58c-.52 0-1 .275-1.26.728l-2.42 4.19a1.45 1.45 0 0 0 0 1.453l.791 1.37c.26.448.74.727 1.26.727h11.36c.52 0 1-.275 1.26-.728l.79-1.37a1.45 1.45 0 0 0 0-1.451l-.79-1.37a1.46 1.46 0 0 0-1.26-.728zM.195 9.905l2.951 5.115a1.46 1.46 0 0 0-.531.531l-.791 1.37a1.45 1.45 0 0 0 0 1.452l.79 1.37c.26.448.74.727 1.26.727h4.84c.52 0 1-.275 1.26-.728l.79-1.37a1.45 1.45 0 0 0 0-1.451L5.086 7.083a1.46 1.46 0 0 0-1.26-.728h-1.58c-.52 0-1 .276-1.26.728l-.79 1.37a1.45 1.45 0 0 0 0 1.452m15.888 13.367 2.951-5.115c.217.125.469.196.728.196h1.582c.52 0 1-.275 1.26-.728l.79-1.37a1.45 1.45 0 0 0 0-1.451l-2.42-4.191a1.46 1.46 0 0 0-1.259-.728h-1.582c-.52 0-1 .276-1.259.728l-5.678 9.838a1.45 1.45 0 0 0 0 1.452l.79 1.37c.26.448.74.727 1.26.727h1.582c.52 0 1-.275 1.26-.728z'
 
 /**
  * One or more LobeHub 24×24 brand-mark paths per provider, all filled with
@@ -745,7 +745,7 @@ const PROVIDER_LOGO_PATHS: Record<BalanceKind, string[]> = {
   moonshot: MOONSHOT_LOGO_PATHS,
   zhipu: [ZHIPU_LOGO_PATH],
   minimax: [MINIMAX_LOGO_PATH],
-  alibaba: ALIBABA_LOGO_PATHS,
+  alibaba: [QWEN_LOGO_PATH],
 }
 
 /**
@@ -940,6 +940,14 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
       urgent: countdown !== undefined && ms <= URGENT_MS,
     })
     if (scope !== 'always') lines.push({ text: alibabaNightLocalLabel(now), muted: true })
+    if (state.discount !== undefined) {
+      lines.push({
+        text: scope === 'always'
+          ? `Limited-time −${state.discount}% around the clock`
+          : 'Qwen −40% · DeepSeek-on-plan −50% during nights',
+        muted: true,
+      })
+    }
     if (state.usedPercent !== undefined) {
       const reset = typeof state.resetAt === 'number' && state.resetAt > now.getTime()
         ? ` · resets in ${formatCountdown(state.resetAt - now.getTime())}`
@@ -951,7 +959,9 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
   } else {
     lines.push({ text: state.heading })
   }
-  lines.push({ text: state.detail, detail: true })
+  // Alibaba's usage line already carries the breakdown; repeating state.detail
+  // would print the same sentence twice.
+  if (state.provider !== 'alibaba') lines.push({ text: state.detail, detail: true })
   lines.push({ text: 'Click to refresh', muted: true })
   return lines
 }
