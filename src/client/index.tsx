@@ -1513,34 +1513,59 @@ export function BalanceChip({
   // finds, so a side panel or sidebar can never cover it: it sits centered
   // normally and slides the minimum distance (smoothly, via the `left`
   // transition) when a bar narrows the lane.
+  const tipOpenRef = useRef(false)
   const showTip = useCallback(() => {
     const anchor = anchorRef.current
     if (anchor === null) return
+    tipOpenRef.current = true
     setTip({ rect: anchor.getBoundingClientRect(), bounds: popoverBounds(anchor) })
   }, [])
-  const hoverTimer = useRef(0)
   const hideTip = useCallback(() => {
-    window.clearTimeout(hoverTimer.current)
+    tipOpenRef.current = false
     setTip(null)
   }, [])
-  // Hover opens only after a short dwell AND only if the pointer is still over
-  // the chip when it fires. Mounting a seat (new session) or the FLIP flight
-  // can sweep the chip under a resting pointer, and the browser then delivers
-  // a mouseenter nobody asked for; the dwell + :hover re-check rejects those.
-  const scheduleTip = useCallback(() => {
-    window.clearTimeout(hoverTimer.current)
-    hoverTimer.current = window.setTimeout(() => {
-      const anchor = anchorRef.current
-      if (anchor === null || !anchor.matches(':hover')) return
-      showTip()
-    }, 120)
-  }, [showTip])
   // Keyboard focus opens at once; programmatic focus (seat swaps, shell
   // autofocus on a new session) does not.
   const focusTip = useCallback((event: FocusEvent<HTMLElement>) => {
     if (event.target.matches(':focus-visible')) showTip()
   }, [showTip])
-  useEffect(() => () => { window.clearTimeout(hoverTimer.current) }, [])
+
+  /**
+   * The popover's whole open/close state machine, driven by polling the chip's
+   * CSS `:hover` state.
+   *
+   * The desktop shell stops pointer/mouse event propagation below document
+   * level, so React's delegated `onMouseLeave` never fires and even a
+   * capture-phase `pointermove` watcher on `document` can go silent — three
+   * event-based fixes in a row failed for that reason. `:hover` is browser
+   * hit-testing state: it flips no matter what JavaScript does with the
+   * events, so polling it is the one signal the shell cannot starve.
+   *
+   * Opening requires a genuine false→true transition plus one more tick, so a
+   * chip that mounts (new session) or flies (FLIP) under a resting pointer
+   * never opens the panel by itself. Closing is immediate on the first tick
+   * outside, and the card takes no pointer events, so no grace is needed.
+   */
+  useEffect(() => {
+    const anchor = anchorRef.current
+    if (anchor === null) return
+    let wasOver = anchor.matches(':hover')
+    let ticks = 0
+    const timer = window.setInterval(() => {
+      const el = anchorRef.current
+      if (el === null) return
+      const over = el.matches(':hover')
+      if (over) {
+        ticks = wasOver ? ticks + 1 : 1
+        if (!wasOver && ticks >= 2 && !tipOpenRef.current) showTip()
+      } else {
+        ticks = 0
+        if (tipOpenRef.current) hideTip()
+      }
+      wasOver = over
+    }, 120)
+    return () => { window.clearInterval(timer) }
+  }, [showTip, hideTip])
 
   // While the popover is open, a window resize or any layout mutation — a
   // side panel opening, the sidebar collapsing — re-measures the seat and
@@ -1596,36 +1621,6 @@ export function BalanceChip({
   // new seat starts clean instead of inheriting a stranded panel.
   useEffect(() => { hideTip() }, [activeSession, blank, hideTip])
 
-  // Pointer-position dismissal: while the panel is open, any move outside
-  // both the chip and the card closes it after a short grace (so crossing
-  // the chip-to-card gap does not flicker). mouseleave alone is not trusted:
-  // seat repaints in the desktop webview can swallow the boundary event and
-  // strand the panel until an outside click.
-  useEffect(() => {
-    if (tip === null) return
-    let grace = 0
-    const onMove = (event: PointerEvent) => {
-      const anchor = anchorRef.current
-      const card = document.querySelector('[data-dsh-balance-tip]')
-      const overAnchor = anchor !== null && pointerInsideRect(event.clientX, event.clientY, anchor.getBoundingClientRect())
-      const overCard = card !== null && pointerInsideRect(event.clientX, event.clientY, card.getBoundingClientRect())
-      window.clearTimeout(grace)
-      if (overAnchor || overCard) return
-      grace = window.setTimeout(() => { hideTip() }, 80)
-    }
-    const onOut = (event: MouseEvent) => { if (event.relatedTarget === null) hideTip() }
-    // Capture phase: the shell stops pointermove/mouseout propagation below
-    // document level, so a bubble-phase listener never sees the moves and the
-    // panel strands open. Capture runs before any handler can stop it.
-    document.addEventListener('pointermove', onMove, { capture: true, passive: true })
-    document.addEventListener('mouseout', onOut, { capture: true })
-    return () => {
-      window.clearTimeout(grace)
-      document.removeEventListener('pointermove', onMove, { capture: true })
-      document.removeEventListener('mouseout', onOut, { capture: true })
-    }
-  }, [tip !== null, hideTip])
-
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll
   // repaints it). Undefined for every other provider and quiet off-peak.
   // Alibaba carries its own night-discount pill on the same seat.
@@ -1644,7 +1639,6 @@ export function BalanceChip({
           style={chipStyle}
           aria-busy="true"
           aria-label="Loading balance"
-          onMouseEnter={scheduleTip}
           onMouseLeave={hideTip}
           onFocus={focusTip}
           onBlur={hideTip}
@@ -1656,7 +1650,6 @@ export function BalanceChip({
           type="button"
           style={chipStyle}
           aria-label={`Balance unavailable — ${state.message}`}
-          onMouseEnter={scheduleTip}
           onMouseLeave={hideTip}
           onFocus={focusTip}
           onBlur={hideTip}
@@ -1669,7 +1662,6 @@ export function BalanceChip({
           type="button"
           style={chipStyle}
           aria-label={`${state.heading} ${state.symbol}${state.total}`}
-          onMouseEnter={scheduleTip}
           onMouseLeave={hideTip}
           onFocus={focusTip}
           onBlur={hideTip}

@@ -18,11 +18,13 @@ and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/
   no longer trigger a phantom hover; focus opens only for keyboard focus
   (`:focus-visible`), not the shell's programmatic autofocus.
 - **Moving the pointer away always closes the popover**, in the hero seat too.
-  Dismissal watches pointer positions against the chip and card rects (80 ms
-  grace so crossing the chip-to-card gap does not flicker) instead of trusting
-  `mouseleave`, which the shell swallows by stopping propagation below
-  document level. The watcher listens in the **capture phase**, so no handler
-  can starve it; pointer leaving the window closes it as well.
+  The panel's open/close state is now driven by polling the chip's CSS
+  `:hover` state: the shell stops pointer/mouse propagation below document
+  level, so React's delegated `onMouseLeave` and even a capture-phase
+  `pointermove` watcher went silent and the panel stranded open. `:hover` is
+  browser hit-testing state, so no handler can starve it. Opening needs a
+  genuine false→true transition plus a confirming tick, which also kills the
+  phantom hover; closing is immediate on the first tick outside.
 - **The popover can always be closed**: Escape and any pointer press outside
   the chip dismiss it, and a session switch or hero/dock seat swap closes it,
   so a missing boundary event can never strand it open until the first send.
