@@ -8,6 +8,20 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.13.0] — 2026-11-11
+
+### Changed
+
+- The npm package is now scoped: **`@adithyanraj03/dsh-balance-plugin`**. The
+  bare `dsh-balance-plugin` name on npm belongs to an unrelated package, so the
+  scoped name is the published install path; the GitHub install
+  (`github:adithyanraj03/dsh-balance-plugin`) keeps working either way. The
+  internal Cordis row id (`dsh-balance`) and the slot id are unchanged, and an
+  existing profile only needs its dependency key re-pointed:
+  `pnpm dsh plugin --profile web remove dsh-balance-plugin`, then
+  `pnpm dsh plugin --profile web add @adithyanraj03/dsh-balance-plugin`
+  (profiles that link the checkout: rename the key and `pnpm install`).
+
 ## [0.12.2] — 2026-11-11
 
 ### Changed

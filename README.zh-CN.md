@@ -22,25 +22,33 @@
 
 ## 安装
 
+从 npm 安装：
+
+```sh
+pnpm dsh plugin --profile web add @adithyanraj03/dsh-balance-plugin
+```
+
+或直接从 GitHub 安装：
+
 ```sh
 pnpm dsh plugin --profile web add github:adithyanraj03/dsh-balance-plugin
 ```
 
-> 未发布到 npm：npm 上的 `dsh-balance-plugin` 名称属于另一个无关的包。请从 GitHub 或本地克隆安装。
+> npm 上的裸名 `dsh-balance-plugin` 属于另一个无关的包。请始终安装带作用域的包名。
 
 **pnpm 10 及以后会拦截未批准包的 `postinstall` 脚本**，而安装一旦非零退出，dsh 就跳过写入 bundle 行——依赖装上了，插件却不可见。若 `add` 以 `ERR_PNPM_IGNORED_BUILDS` 结束，批准后再跑一次：
 
 ```sh
-cd ~/.dsh/profiles/web && pnpm approve-builds      # 勾选 dsh-balance-plugin
-pnpm dsh plugin --profile web add github:adithyanraj03/dsh-balance-plugin
+cd ~/.dsh/profiles/web && pnpm approve-builds      # 勾选 @adithyanraj03/dsh-balance-plugin
+pnpm dsh plugin --profile web add @adithyanraj03/dsh-balance-plugin
 ```
 
 确认挂载成功——插件必须同时出现在 `dependencies` 与 `dsh.profile.bundles` 中：
 
 ```sh
 cd ~/.dsh/profiles/web && node -e "const p=require('./package.json');
-  console.log(p.dependencies['dsh-balance-plugin'],
-              p.dsh.profile.bundles.includes('dsh-balance-plugin'))"
+  console.log(p.dependencies['@adithyanraj03/dsh-balance-plugin'],
+              p.dsh.profile.bundles.includes('@adithyanraj03/dsh-balance-plugin'))"
 ```
 
 ### 桌面应用内
