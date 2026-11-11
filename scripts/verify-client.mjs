@@ -15,6 +15,9 @@ globalThis.window = {
   // The chip's refresh effect arms a timer; capture it without running it.
   setInterval: () => 0,
   clearInterval: () => {},
+  // The hover dwell and its cancellation; captured, never run.
+  setTimeout: () => 0,
+  clearTimeout: () => {},
 }
 
 const code = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')

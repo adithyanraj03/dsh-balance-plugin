@@ -38,7 +38,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, FocusEvent } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
@@ -1242,7 +1242,7 @@ function ChipTooltip({ state, rect, bounds }: { readonly state: DisplayState; re
         ? alibabaAccentInk(state)
         : 'var(--dsw-alias-state-business-primary)'
   return createPortal(
-    <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6, width, minWidth: Math.min(250, width), borderLeft: `3px solid ${accent}` }}>
+    <div role="tooltip" data-dsh-balance-tip="" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6, width, minWidth: Math.min(250, width), borderLeft: `3px solid ${accent}` }}>
       {lines.flatMap((line, index) => {
         const isFooter = index === lines.length - 1
         const node = line.countdown !== undefined ? (
@@ -1504,7 +1504,29 @@ export function BalanceChip({
     if (anchor === null) return
     setTip({ rect: anchor.getBoundingClientRect(), bounds: popoverBounds(anchor) })
   }, [])
-  const hideTip = useCallback(() => { setTip(null) }, [])
+  const hoverTimer = useRef(0)
+  const hideTip = useCallback(() => {
+    window.clearTimeout(hoverTimer.current)
+    setTip(null)
+  }, [])
+  // Hover opens only after a short dwell AND only if the pointer is still over
+  // the chip when it fires. Mounting a seat (new session) or the FLIP flight
+  // can sweep the chip under a resting pointer, and the browser then delivers
+  // a mouseenter nobody asked for; the dwell + :hover re-check rejects those.
+  const scheduleTip = useCallback(() => {
+    window.clearTimeout(hoverTimer.current)
+    hoverTimer.current = window.setTimeout(() => {
+      const anchor = anchorRef.current
+      if (anchor === null || !anchor.matches(':hover')) return
+      showTip()
+    }, 120)
+  }, [showTip])
+  // Keyboard focus opens at once; programmatic focus (seat swaps, shell
+  // autofocus on a new session) does not.
+  const focusTip = useCallback((event: FocusEvent<HTMLElement>) => {
+    if (event.target.matches(':focus-visible')) showTip()
+  }, [showTip])
+  useEffect(() => () => { window.clearTimeout(hoverTimer.current) }, [])
 
   // While the popover is open, a window resize or any layout mutation — a
   // side panel opening, the sidebar collapsing — re-measures the seat and
@@ -1515,7 +1537,15 @@ export function BalanceChip({
     if (tip === null) return
     const onMove = () => { showTip() }
     let frame = 0
-    const onMutation = () => {
+    const onMutation = (records: MutationRecord[]) => {
+      // The popover's own portal lives in body; its repaints must not
+      // re-trigger the observer, or every open popover spins a measure loop.
+      const external = records.some((record) => {
+        const node = record.target
+        const el = node instanceof Element ? node : node.parentElement
+        return el === null || el.closest('[data-dsh-balance-tip]') === null
+      })
+      if (!external) return
       if (frame !== 0) return
       frame = requestAnimationFrame(() => { frame = 0; showTip() })
     }
@@ -1528,6 +1558,29 @@ export function BalanceChip({
       if (frame !== 0) cancelAnimationFrame(frame)
     }
   }, [tip !== null, showTip])
+
+  // Escape and any pointer press outside the chip close the popover, so a
+  // boundary event that never arrives (seat swaps, pointer left the window)
+  // can never strand it open.
+  useEffect(() => {
+    if (tip === null) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') hideTip() }
+    const onDown = (event: PointerEvent) => {
+      const anchor = anchorRef.current
+      const target = event.target
+      if (anchor !== null && target instanceof Node && !anchor.contains(target)) hideTip()
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onDown)
+    }
+  }, [tip !== null, hideTip])
+
+  // A session switch or the hero/dock seat swap closes any open popover: the
+  // new seat starts clean instead of inheriting a stranded panel.
+  useEffect(() => { hideTip() }, [activeSession, blank, hideTip])
 
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll
   // repaints it). Undefined for every other provider and quiet off-peak.
@@ -1547,9 +1600,9 @@ export function BalanceChip({
           style={chipStyle}
           aria-busy="true"
           aria-label="Loading balance"
-          onMouseEnter={showTip}
+          onMouseEnter={scheduleTip}
           onMouseLeave={hideTip}
-          onFocus={showTip}
+          onFocus={focusTip}
           onBlur={hideTip}
         >
           <span style={amountStyle}>Loading…</span>
@@ -1559,9 +1612,9 @@ export function BalanceChip({
           type="button"
           style={chipStyle}
           aria-label={`Balance unavailable — ${state.message}`}
-          onMouseEnter={showTip}
+          onMouseEnter={scheduleTip}
           onMouseLeave={hideTip}
-          onFocus={showTip}
+          onFocus={focusTip}
           onBlur={hideTip}
           onClick={() => { void refresh() }}
         >
@@ -1572,9 +1625,9 @@ export function BalanceChip({
           type="button"
           style={chipStyle}
           aria-label={`${state.heading} ${state.symbol}${state.total}`}
-          onMouseEnter={showTip}
+          onMouseEnter={scheduleTip}
           onMouseLeave={hideTip}
-          onFocus={showTip}
+          onFocus={focusTip}
           onBlur={hideTip}
           onClick={() => { void refresh() }}
         >

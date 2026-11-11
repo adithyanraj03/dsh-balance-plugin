@@ -8,6 +8,21 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.13.4] — 2026-11-11
+
+### Fixed
+
+- **The popover no longer opens by itself on a new session.** Hover now opens
+  only after a 120 ms dwell with the pointer still over the chip, so a seat
+  mounting (or the FLIP flight sweeping the chip) under a resting pointer can
+  no longer trigger a phantom hover; focus opens only for keyboard focus
+  (`:focus-visible`), not the shell's programmatic autofocus.
+- **The popover can always be closed**: Escape and any pointer press outside
+  the chip dismiss it, and a session switch or hero/dock seat swap closes it,
+  so a missing boundary event can never strand it open until the first send.
+- The reposition observer ignores the popover's own portal mutations, ending
+  a self-triggering measure loop while the panel was open.
+
 ## [0.13.3] — 2026-11-11
 
 ### Fixed
