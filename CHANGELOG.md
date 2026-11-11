@@ -8,6 +8,15 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.13.3] — 2026-11-11
+
+### Fixed
+
+- The npm scope is **`@adithyanraj`** — the owner's actual npm username. The
+  previous `@adithyanraj03` scope (the GitHub handle) does not exist on npm, so
+  `npm publish` failed with `404 Scope not found`. GitHub URLs are unchanged;
+  only the package specifier moved. Profiles re-pointed accordingly.
+
 ## [0.13.2] — 2026-11-11
 
 ### Changed

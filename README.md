@@ -25,7 +25,7 @@ It does four things:
 From npm:
 
 ```sh
-pnpm dsh plugin --profile web add @adithyanraj03/dsh-balance-plugin
+pnpm dsh plugin --profile web add @adithyanraj/dsh-balance-plugin
 ```
 
 Or straight from GitHub:
@@ -39,16 +39,16 @@ pnpm dsh plugin --profile web add github:adithyanraj03/dsh-balance-plugin
 **pnpm 10 and later block `postinstall` scripts from unapproved packages**, and dsh skips writing the plugin's bundle row whenever the install exits non-zero — the dependency lands, the plugin stays invisible. If `add` ends with `ERR_PNPM_IGNORED_BUILDS`, approve and re-run:
 
 ```sh
-cd ~/.dsh/profiles/web && pnpm approve-builds      # tick @adithyanraj03/dsh-balance-plugin
-pnpm dsh plugin --profile web add @adithyanraj03/dsh-balance-plugin
+cd ~/.dsh/profiles/web && pnpm approve-builds      # tick @adithyanraj/dsh-balance-plugin
+pnpm dsh plugin --profile web add @adithyanraj/dsh-balance-plugin
 ```
 
 Confirm it mounted — the plugin must appear in **both** `dependencies` and `dsh.profile.bundles`:
 
 ```sh
 cd ~/.dsh/profiles/web && node -e "const p=require('./package.json');
-  console.log(p.dependencies['@adithyanraj03/dsh-balance-plugin'],
-              p.dsh.profile.bundles.includes('@adithyanraj03/dsh-balance-plugin'))"
+  console.log(p.dependencies['@adithyanraj/dsh-balance-plugin'],
+              p.dsh.profile.bundles.includes('@adithyanraj/dsh-balance-plugin'))"
 ```
 
 ### In the desktop app
