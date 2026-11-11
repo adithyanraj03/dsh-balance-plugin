@@ -76,6 +76,10 @@ Hovering opens the popover; clicking refreshes. The amount is never dropped for 
 
 ![The chip and its hover popover in the composer dock](assets/popover-dock.png)
 
+Hovering and switching model, live: the popover and the pill follow the selection from a DeepSeek-on-plan model to the Qwen launch promo.
+
+![Hovering the chip and switching model](assets/chip-hover.gif)
+
 ### The providers
 
 | provider | balance source | billing windows |
@@ -100,11 +104,11 @@ bl auth login --console        # browser login; international accounts add --con
 
 With `bl` installed and logged in, the chip shows percent used and the window reset countdown (`4.22% · resets in 1d 6h`); without it, the chip runs in night-discount-only mode and says where the credits live. Readings cache for five minutes.
 
-Design previews of the Alibaba chip and popover (rendered by `scripts/make-chip-preview.py`; a live session shows your own numbers):
+Live captures from a Model Studio session — the all-day launch promo, and the last hour before nights open on a DeepSeek-on-plan model:
 
-![Alibaba chip design preview](assets/chip-alibaba.png)
+![Alibaba Token Plan chip with the all-day −80% promo](assets/alibaba-always.png)
 
-![Alibaba popover design preview](assets/popover-alibaba.png)
+![Alibaba Token Plan chip with nights approaching at −50%](assets/alibaba-approach-deepseek.png)
 
 ## Configuration
 
@@ -131,7 +135,6 @@ pnpm run build                  # tsdown: host ESM + client CJS
 node scripts/verify-client.mjs  # bundle contract, slot registration, provider resolution
 node --test test/*.test.mjs     # 33 tests against the built bundle
 python scripts/make-banner.py   # regenerate the README banners (Pillow)
-python scripts/make-chip-preview.py  # regenerate the Alibaba design previews
 ```
 
 ## Troubleshooting

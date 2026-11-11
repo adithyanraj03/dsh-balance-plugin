@@ -8,6 +8,16 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.13.2] — 2026-11-11
+
+### Changed
+
+- The READMEs now show **live captures** instead of rendered previews: the
+  all-day −80% promo and the nights-approaching −50% state, plus a 270 KB GIF
+  of hovering the chip and switching model (popover and pill follow the
+  selection). `screenshots.json` follows; the Pillow preview generator and
+  its rasterized Qwen mark are removed.
+
 ## [0.13.1] — 2026-11-11
 
 ### Fixed

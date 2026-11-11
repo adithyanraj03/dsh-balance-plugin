@@ -76,6 +76,10 @@ https://github.com/adithyanraj03/dsh-balance-plugin
 
 ![composer dock 中的胶囊及其悬停弹层](assets/popover-dock.png)
 
+实时录屏：悬停并切换模型，弹层与药丸跟随选择，从 plan 内 DeepSeek 模型切换到 Qwen 限时优惠。
+
+![悬停胶囊并切换模型](assets/chip-hover.gif)
+
 ### 服务商
 
 | 服务商 | 余额来源 | 计费窗口 |
@@ -100,11 +104,11 @@ bl auth login --console        # 浏览器登录；国际站账号加 --console-
 
 `bl` 已安装并登录后，胶囊显示已用百分比与窗口重置倒计时（`4.22% · resets in 1d 6h`）；否则胶囊运行在仅夜间折扣模式，并说明额度在控制台查看。读数缓存五分钟。
 
-阿里云胶囊与弹层的设计预览（由 `scripts/make-chip-preview.py` 渲染；实际会话显示你自己的数字）：
+来自百炼会话的实时截图——全天限时优惠，以及 plan 内 DeepSeek 模型在夜间窗口开启前最后一小时：
 
-![阿里云胶囊设计预览](assets/chip-alibaba.png)
+![阿里云 Token Plan 胶囊，全天 −80% 优惠](assets/alibaba-always.png)
 
-![阿里云弹层设计预览](assets/popover-alibaba.png)
+![阿里云 Token Plan 胶囊，夜间 −50% 临近](assets/alibaba-approach-deepseek.png)
 
 ## 配置
 
@@ -131,7 +135,6 @@ pnpm run build                  # tsdown：宿主 ESM + 客户端 CJS
 node scripts/verify-client.mjs  # bundle 契约、slot 注册、服务商解析
 node --test test/*.test.mjs     # 33 个针对构建产物的测试
 python scripts/make-banner.py   # 重新生成 README 横幅（Pillow）
-python scripts/make-chip-preview.py  # 重新生成阿里云设计预览
 ```
 
 ## 故障排查
