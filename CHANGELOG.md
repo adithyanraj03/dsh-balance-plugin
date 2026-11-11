@@ -8,6 +8,22 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.13.1] — 2026-11-11
+
+### Fixed
+
+- The Alibaba popover no longer repeats the discount rate: the heading pill
+  carries it (`Token Plan · Nights −50%`) and the right-hand countdown carries
+  only the time (`in 38m`, `ends in 6h 02m`), matching the DeepSeek idiom.
+- The popover's left accent bar follows the discount ink for Alibaba — teal
+  while a discount runs, red in the last hour before the window opens, neutral
+  blue for models outside the promo — instead of always business blue.
+- The night heading pill is teal rather than the off-peak green, so pill and
+  countdown no longer clash in two greens.
+- The usage line (`8.15% of 1-month credits used · resets in …`) is emphasized
+  like DeepSeek's total line: bold first segment, muted remainder, instead of
+  fully muted.
+
 ## [0.13.0] — 2026-11-11
 
 ### Changed

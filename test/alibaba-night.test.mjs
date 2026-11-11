@@ -165,13 +165,14 @@ test('the popover names the night status, the local window and the usage line', 
   }, 'qwen3.8-max')
   const night = tooltipLines(state, at('2026-11-11T15:00:00Z'))
   assert.equal(night[0].text, 'Token Plan · Night −40% now')
-  assert.equal(night[0].countdown, 'day in 9h')
+  assert.equal(night[0].countdown, 'ends in 9h')
   assert.match(night[1].text, /^Nights 7:30\s*PM\s*–\s*5:30\s*AM \(GMT\+5:30\)$/i, night[1].text)
   assert.equal(night[2].text, 'Qwen −40% · DeepSeek-on-plan −50% during nights')
   assert.match(night[3].text, /4\.22% of 1-month credits used · resets in 1h/)
+  assert.equal(night[3].detail, true)
   const day = tooltipLines(state, at('2026-11-11T13:30:00Z'))
   assert.equal(day[0].text, 'Token Plan · Nights −40%')
-  assert.equal(day[0].countdown, '−40% in 30m')
+  assert.equal(day[0].countdown, 'in 30m')
   const noBl = tooltipLines(
     renderAlibaba({ ok: true, provider: 'alibaba', balance: { source: 'none' } }, 'qwen3.8-max'),
     at('2026-11-11T15:00:00Z'),

@@ -837,6 +837,8 @@ export interface TooltipLine {
   readonly peak?: boolean
   /** DeepSeek heading only: countdown ink — green when peak is ending, red when it approaches. */
   readonly countdownColor?: CSSProperties['color']
+  /** Heading pill ink override; Alibaba's night pill is teal, not the off-peak green. */
+  readonly pillColor?: CSSProperties['color']
   /** DeepSeek heading only: under five minutes to the boundary, so the countdown waves. */
   readonly urgent?: boolean
   /** The provider breakdown line, rendered with its first segment emphasized. */
@@ -924,8 +926,8 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
     const scope = state.discountScope
     const countdown = scope === 'night'
       ? night
-        ? `day in ${formatCountdown(ms)}`
-        : to === 'night' && ms <= HOUR_MS ? `−${state.discount}% in ${formatCountdown(ms)}` : undefined
+        ? `ends in ${formatCountdown(ms)}`
+        : to === 'night' && ms <= HOUR_MS ? `in ${formatCountdown(ms)}` : undefined
       : undefined
     const status = state.discount === undefined
       ? ''
@@ -936,6 +938,9 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
       text: `${state.heading}${status}`,
       countdown,
       peak: countdown !== undefined && !night,
+      // The pill carries the rate, the countdown carries only the time, so the
+      // two never repeat each other (the DeepSeek idiom).
+      pillColor: countdown === undefined ? undefined : night ? TEAL_INK : 'var(--dsw-alias-state-error-primary)',
       countdownColor: night ? TEAL_INK : 'var(--dsw-alias-state-error-primary)',
       urgent: countdown !== undefined && ms <= URGENT_MS,
     })
@@ -952,7 +957,7 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
       const reset = typeof state.resetAt === 'number' && state.resetAt > now.getTime()
         ? ` · resets in ${formatCountdown(state.resetAt - now.getTime())}`
         : ''
-      lines.push({ text: `${state.usedPercent.toFixed(2)}% of ${state.windowLabel ?? 'plan'} credits used${reset}`, muted: true })
+      lines.push({ text: `${state.usedPercent.toFixed(2)}% of ${state.windowLabel ?? 'plan'} credits used${reset}`, detail: true })
     } else {
       lines.push({ text: 'Usage % appears once the bl CLI is installed and logged in', muted: true })
     }
@@ -1028,6 +1033,23 @@ export function alibabaChipTimer(
     return { text: `−${discount}% in ${formatCountdown(ms)}`, peak: true, urgent: ms <= URGENT_MS, color: 'var(--dsw-alias-state-error-primary)' }
   }
   return undefined
+}
+
+/**
+ * The popover's left accent bar for Alibaba, following the same ink rule as
+ * the chip pill: teal while a discount runs (night window or all-day promo),
+ * red through the last hour before the window opens, and the neutral business
+ * blue for models outside the promo list. DeepSeek's bar follows its own
+ * peak/off-peak rule; every other provider keeps the business blue.
+ */
+function alibabaAccentInk(state: Extract<DisplayState, { kind: 'ok' }>): CSSProperties['color'] {
+  const business = 'var(--dsw-alias-state-business-primary)'
+  if (state.discount === undefined) return business
+  if (state.discountScope === 'always' || isAlibabaNight()) return TEAL_INK
+  const { at, to } = nextAlibabaTransition()
+  return to === 'night' && at.getTime() - Date.now() <= HOUR_MS
+    ? 'var(--dsw-alias-state-error-primary)'
+    : business
 }
 
 /**
@@ -1216,7 +1238,9 @@ function ChipTooltip({ state, rect, bounds }: { readonly state: DisplayState; re
     ? 'var(--dsw-alias-state-warn-primary)'
     : state.provider === 'deepseek'
       ? (isPeakHour() ? peakInk : offInk)
-      : 'var(--dsw-alias-state-business-primary)'
+      : state.provider === 'alibaba'
+        ? alibabaAccentInk(state)
+        : 'var(--dsw-alias-state-business-primary)'
   return createPortal(
     <div role="tooltip" style={{ ...tooltipStyle, left, bottom: window.innerHeight - rect.top + 6, width, minWidth: Math.min(250, width), borderLeft: `3px solid ${accent}` }}>
       {lines.flatMap((line, index) => {
@@ -1224,7 +1248,7 @@ function ChipTooltip({ state, rect, bounds }: { readonly state: DisplayState; re
         const node = line.countdown !== undefined ? (
           <span key={index} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {state.kind === 'ok' && <ProviderLogo provider={state.provider} />}
-            <span style={statusPillStyle(line.peak === true ? peakInk : offInk)}>{line.text}</span>
+            <span style={statusPillStyle(line.pillColor ?? (line.peak === true ? peakInk : offInk))}>{line.text}</span>
             <span style={{ ...tooltipCountdownStyle, color: line.countdownColor, ...waveStyle(line.urgent) }}>
               {line.countdown}
             </span>
