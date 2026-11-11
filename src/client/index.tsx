@@ -1614,12 +1614,15 @@ export function BalanceChip({
       grace = window.setTimeout(() => { hideTip() }, 80)
     }
     const onOut = (event: MouseEvent) => { if (event.relatedTarget === null) hideTip() }
-    document.addEventListener('pointermove', onMove, { passive: true })
-    document.addEventListener('mouseout', onOut)
+    // Capture phase: the shell stops pointermove/mouseout propagation below
+    // document level, so a bubble-phase listener never sees the moves and the
+    // panel strands open. Capture runs before any handler can stop it.
+    document.addEventListener('pointermove', onMove, { capture: true, passive: true })
+    document.addEventListener('mouseout', onOut, { capture: true })
     return () => {
       window.clearTimeout(grace)
-      document.removeEventListener('pointermove', onMove)
-      document.removeEventListener('mouseout', onOut)
+      document.removeEventListener('pointermove', onMove, { capture: true })
+      document.removeEventListener('mouseout', onOut, { capture: true })
     }
   }, [tip !== null, hideTip])
 
