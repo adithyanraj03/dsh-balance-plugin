@@ -1502,11 +1502,6 @@ export function BalanceChip({
     if (anchor !== null) rememberChipAnchor(anchor)
   })
 
-  // The hero seat belongs to the blank session: the moment the first prompt
-  // is sent the shell swaps to the composer view, the dock instance takes
-  // over, and this one's remembered position becomes its flight's origin.
-  if (variant === 'hero' && !blank) return null
-
   // The tooltip measures the chip on show, so it can float `position: fixed`
   // above the seat without being clipped by ancestor overflow. It centers on
   // the chip and is clamped to the lane between the bars `popoverBounds`
@@ -1549,23 +1544,45 @@ export function BalanceChip({
   useEffect(() => {
     const anchor = anchorRef.current
     if (anchor === null) return
+    // A chip that is already under the pointer when it mounts (new session,
+    // FLIP landing) starts "hovered" with no enter to count, so it cannot
+    // open by itself: only a false→true transition while mounted arms it.
     let wasOver = anchor.matches(':hover')
+    let armed = false
     let ticks = 0
+    let lastEl: HTMLElement = anchor
     const timer = window.setInterval(() => {
       const el = anchorRef.current
       if (el === null) return
+      if (el !== lastEl) {
+        // The seat re-mounted (hero↔dock, session switch): re-seed from the
+        // new element so a stale transition cannot open or strand the panel.
+        lastEl = el
+        wasOver = el.matches(':hover')
+        armed = false
+        ticks = 0
+      }
       const over = el.matches(':hover')
       if (over) {
-        ticks = wasOver ? ticks + 1 : 1
-        if (!wasOver && ticks >= 2 && !tipOpenRef.current) showTip()
+        if (!wasOver) {
+          // A fresh enter: arm and restart the dwell count.
+          armed = true
+          ticks = 0
+        }
+        if (armed) ticks += 1
+        if (armed && ticks >= 2 && !tipOpenRef.current) showTip()
       } else {
+        armed = false
         ticks = 0
         if (tipOpenRef.current) hideTip()
       }
       wasOver = over
     }, 120)
     return () => { window.clearInterval(timer) }
-  }, [showTip, hideTip])
+    // `variant`/`blank` re-run this when the seat becomes visible: a hero
+    // instance whose first render is hidden has no anchor yet and would
+    // otherwise never start polling for the rest of its life.
+  }, [showTip, hideTip, variant, blank])
 
   // While the popover is open, a window resize or any layout mutation — a
   // side panel opening, the sidebar collapsing — re-measures the seat and
@@ -1620,6 +1637,13 @@ export function BalanceChip({
   // A session switch or the hero/dock seat swap closes any open popover: the
   // new seat starts clean instead of inheriting a stranded panel.
   useEffect(() => { hideTip() }, [activeSession, blank, hideTip])
+
+  // The hero seat belongs to the blank session: the moment the first prompt
+  // is sent the shell swaps to the composer view, the dock instance takes
+  // over, and this one's remembered position becomes its flight's origin.
+  // This return sits after every hook so the hook order stays stable when the
+  // seat hides and shows again.
+  if (variant === 'hero' && !blank) return null
 
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll
   // repaints it). Undefined for every other provider and quiet off-peak.

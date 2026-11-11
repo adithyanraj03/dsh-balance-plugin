@@ -22,9 +22,13 @@ and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/
   `:hover` state: the shell stops pointer/mouse propagation below document
   level, so React's delegated `onMouseLeave` and even a capture-phase
   `pointermove` watcher went silent and the panel stranded open. `:hover` is
-  browser hit-testing state, so no handler can starve it. Opening needs a
-  genuine false→true transition plus a confirming tick, which also kills the
-  phantom hover; closing is immediate on the first tick outside.
+  browser hit-testing state, so no handler can starve it. Opening requires a
+  genuine false→true transition plus one confirming tick — a chip that mounts
+  or flies under a resting pointer starts "hovered" with no enter to count, so
+  it never opens by itself — and closing is immediate on the first tick
+  outside. The poll re-seeds when the seat re-mounts, and starts when a hidden
+  seat becomes visible. Five behavioural tests drive the real interval
+  callback out of the built bundle.
 - **The popover can always be closed**: Escape and any pointer press outside
   the chip dismiss it, and a session switch or hero/dock seat swap closes it,
   so a missing boundary event can never strand it open until the first send.
