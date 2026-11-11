@@ -8,6 +8,25 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 The unscoped `dsh-balance-plugin` name on npm belongs to an unrelated package, so this
 project is not published there.
 
+## [0.12.2] — 2026-11-11
+
+### Changed
+
+- The package description names all six providers and the countdowns, and is
+  verbatim identical to the marketplace entry sentence (their CI and human
+  reviewers compare the two).
+
+### Added
+
+- Repo topics required by marketplace CI: `dsh-plugin`, `dsh`,
+  `deepseek-harness`, `balance`, `usage`.
+- Release asset `plugin.tgz` (the `npm pack` output) so the marketplace
+  `tarball:` key (`releases/latest/download/plugin.tgz`) resolves.
+- Local-only, gitignored `PUBLISHING.md` / `MARKETPLACE.md` playbooks recording
+  the npm name situation (bare name squatted; scoped
+  `@adithyanraj03/dsh-balance-plugin` free) and the awesome-dsh-plugin
+  submission steps.
+
 ## [0.12.1] — 2026-11-11
 
 ### Changed

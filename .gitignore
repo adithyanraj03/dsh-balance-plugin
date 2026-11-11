@@ -12,6 +12,7 @@ lib/
 
 # Internal release notes (kept locally, never published)
 PUBLISHING.md
+MARKETPLACE.md
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
