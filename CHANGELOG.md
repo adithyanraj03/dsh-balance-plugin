@@ -8,6 +8,18 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/@adithyanraj/dsh-balance-plugin)
 (the unscoped `dsh-balance-plugin` name belongs to an unrelated package).
 
+## [0.16.0] — 2026-11-12
+
+### Changed
+
+- **Sign-in is now a button, not an ambush.** When the Token Plan console
+  session expires, the percentage slot becomes a refresh‑% affordance and
+  clicking the chip opens the login terminal on demand (`?kind=alibaba&login=1`).
+  The terminal still titles itself, echoes the command, and stays open.
+  Auto-open on expiry is now **opt-in** via `DSH_BALANCE_AUTOLOGIN=1`
+  (replaces `DSH_BALANCE_NO_AUTOLOGIN`); by default nothing launches until you
+  click. The popover footer reads "Click the chip to sign in".
+
 ## [0.15.2] — 2026-11-12
 
 ### Fixed

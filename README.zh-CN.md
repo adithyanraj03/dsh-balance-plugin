@@ -123,7 +123,7 @@ bl auth login --console        # 浏览器登录；国际站账号加 --console-
 |---|---|---|
 | `DSH_BALANCE_MOCK=1` 或 `?mock=1` | 关 | 每个服务商的 canned 余额，无需账户 |
 | `DSH_BALANCE_BL` | PATH 上的 `bl` | 百炼 CLI 可执行文件路径 |
-| `DSH_BALANCE_NO_AUTOLOGIN=1` | 关 | Token Plan 会话过期时不再自动打开登录终端 |
+| `DSH_BALANCE_AUTOLOGIN=1` | 关 | Token Plan 会话过期时也自动打开登录终端（默认改为胶囊上的登录按钮） |
 
 服务商密钥先解析 `~/.dsh/.credentials.yaml`，再回退环境变量（`DEEPSEEK_API_KEY`、`OPENROUTER_API_KEY`、`MOONSHOT_API_KEY`、`ZAI_API_KEY`/`GLM_API_KEY`/`ZHIPU_API_KEY`、`MINIMAX_API_KEY`）。阿里云完全不需要密钥。
 

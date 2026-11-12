@@ -161,6 +161,8 @@ type DisplayState =
       discountScope?: 'night' | 'always'
       /** Alibaba only: why no usage percentage is available (expired login, …). */
       note?: string
+      /** Alibaba only: the console session expired; show a sign-in button. */
+      needsLogin?: boolean
       dotColor: CSSProperties['background']
     }
   | { kind: 'error'; message: string }
@@ -755,6 +757,7 @@ function renderAlibaba(data: BalanceResponse, model?: string): DisplayState {
     discount: discount?.percent,
     discountScope: discount?.scope,
     note: typeof info?.note === 'string' ? info.note : undefined,
+    needsLogin: used === undefined && typeof info?.note === 'string' && info.note.startsWith('bl console session expired'),
     dotColor: used === undefined || used < 90
       ? 'var(--dsw-alias-state-success-primary)'
       : 'var(--dsw-alias-state-error-primary)',
@@ -1264,6 +1267,32 @@ function ClockGlyph() {
       </g>
     </svg>
   )
+}
+
+/** A circular refresh arrow, used by the sign-in button in the percentage slot. */
+function RefreshGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" style={{ flex: 'none' }}>
+      <path d="M10 6a4 4 0 1 1-1.2-2.85" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M9.2 1.4v2h-2" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** The sign-in control that replaces the percentage when the session expired. */
+const loginButtonStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  fontSize: 11,
+  fontWeight: 600,
+  padding: '0 7px',
+  height: 18,
+  borderRadius: 999,
+  cursor: 'pointer',
+  color: 'var(--dsw-alias-label-secondary)',
+  background: 'color-mix(in srgb, var(--dsw-alias-label-secondary) 12%, transparent)',
+  border: '0.5px solid color-mix(in srgb, var(--dsw-alias-label-secondary) 38%, transparent)',
 }
 
 /**
@@ -1785,12 +1814,21 @@ export function BalanceChip({
     setShowIdx((i) => nextShowcaseIndex(i, showcaseAvailable))
   }
   const onChipClick = (): void => {
-    if (showcase) {
+    if (view.kind === 'ok' && view.provider === 'alibaba' && view.needsLogin) {
+      triggerLogin()
+    } else if (showcase) {
       advanceShowcase()
       void loadShowcase()
     } else {
       void refresh()
     }
+  }
+  // The sign-in button in the percentage slot: ask the host to open the login
+  // terminal, then re-read so the percentage appears once sign-in completes.
+  const triggerLogin = (): void => {
+    void fetch(`${BALANCE_ENDPOINT}?kind=alibaba&login=1`, { headers: { accept: 'application/json' } })
+      .then(() => { if (showcase) void loadShowcase(); else void refresh() })
+      .catch(() => { /* host unreachable; the note already explains */ })
   }
   const changeLabel = view.kind === 'ok' ? nextChangeLabel(view.provider) : null
   const showcaseExtra: TooltipLine[] | undefined = showcase
@@ -1848,8 +1886,17 @@ export function BalanceChip({
         >
           <ProviderLogo provider={view.provider} />
           {/* The amount is the point of the chip, so it is never dropped for the
-              account label's sake. */}
-          <span style={amountStyle}>{view.symbol}{view.total}</span>
+              account label's sake. When the Token Plan session expired, the
+              percentage slot becomes a sign-in affordance (refresh + %); the
+              whole chip is the button that launches the login terminal. */}
+          {view.provider === 'alibaba' && view.needsLogin ? (
+            <span style={loginButtonStyle} aria-label="Sign in to Alibaba Cloud Token Plan">
+              <RefreshGlyph />
+              {'%'}
+            </span>
+          ) : (
+            <span style={amountStyle}>{view.symbol}{view.total}</span>
+          )}
           <span role="img" aria-label={view.detail} style={{ ...dotBaseStyle, background: view.dotColor }} />
           {/* DeepSeek carries its billing countdown right on the strip, next to
               the dot: a tinted pill with a clock whose hand sweeps and pops —
@@ -1869,7 +1916,7 @@ export function BalanceChip({
           rect={tip.rect}
           bounds={tip.bounds}
           extra={showcaseExtra}
-          footer={showcase ? 'Click for the next provider' : undefined}
+          footer={showcase ? 'Click for the next provider' : (view.kind === 'ok' && view.needsLogin ? 'Click the chip to sign in' : undefined)}
         />
       )}
     </div>

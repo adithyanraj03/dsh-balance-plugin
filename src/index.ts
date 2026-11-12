@@ -249,28 +249,44 @@ export function shouldAutoLogin(note: unknown, now: number, lastSpawn: number, d
 }
 
 let lastAutoLogin = 0
+let lastManualLogin = 0
 
 /**
  * Open a visible terminal that runs the bl console login, so the user can
  * finish the browser flow without hunting for a shell. The CLI opens the
  * browser itself; `/k` keeps the window open afterwards. Windows only; a
- * no-op elsewhere. Opt out with DSH_BALANCE_NO_AUTOLOGIN=1.
+ * no-op elsewhere. The session titles itself and echoes the exact command
+ * before running it, so the user can see what launched and why.
+ * @returns whether a terminal was actually launched.
  */
-function maybeAutoLogin(note: unknown): void {
-  const now = Date.now()
-  if (!shouldAutoLogin(note, now, lastAutoLogin, process.env.DSH_BALANCE_NO_AUTOLOGIN === '1')) return
-  if (process.platform !== 'win32') return
-  lastAutoLogin = now
-  // A detached cmd.exe with no inherited stdio allocates its own visible
-  // console; /k keeps it open after the login finishes. No `start` and no
-  // title argument to `start`, so there is no quoting for Windows to
-  // mis-parse. The session titles itself and echoes the exact command before
-  // running it, so the user can see what launched and why.
+function launchLoginTerminal(): boolean {
+  if (process.platform !== 'win32') return false
   const login = 'bl auth login --console --console-site international'
   const child = spawn('cmd.exe', [
     '/k', `title DSH balance - bl login & echo Running: ${login} & ${login}`,
   ], { detached: true, stdio: 'ignore', windowsHide: false })
   child.unref()
+  return true
+}
+
+/**
+ * Auto-open is opt-in (DSH_BALANCE_AUTOLOGIN=1); by default the chip shows a
+ * sign-in button instead and the user launches the terminal deliberately.
+ */
+function maybeAutoLogin(note: unknown): void {
+  const now = Date.now()
+  if (!shouldAutoLogin(note, now, lastAutoLogin, process.env.DSH_BALANCE_AUTOLOGIN !== '1')) return
+  if (launchLoginTerminal()) lastAutoLogin = now
+}
+
+/** On-demand launch from the chip's sign-in button; bounded against double-clicks. */
+function manualLogin(): boolean {
+  const now = Date.now()
+  if (now - lastManualLogin < 5_000) return false
+  if (!launchLoginTerminal()) return false
+  lastManualLogin = now
+  blCache = undefined // re-read quota on the next poll once sign-in completes
+  return true
 }
 
 /**
@@ -366,12 +382,30 @@ async function handleBalance(ctx: Context, req: IncomingMessage, res: ServerResp
     return
   }
   if (kind === 'alibaba') {
+    const params = new URL(req.url ?? '/', 'http://internal').searchParams
+    // On-demand sign-in: the chip's refresh-% button asks the host to open the
+    // login terminal. Deliberate user action, so no cooldown beyond double-click.
+    if (params.get('login') === '1') {
+      const launched = manualLogin()
+      json(res, 200, {
+        ok: true,
+        provider: kind,
+        balance: {
+          plan: 'Token Plan',
+          source: 'none',
+          note: launched
+            ? 'Login terminal opened — finish sign-in in the browser'
+            : 'Login terminal already opening — finish sign-in in the browser',
+        },
+      })
+      return
+    }
     // No credential and no upstream call: the night-discount window is public
     // pricing knowledge the client computes itself, and the optional usage
     // percentage comes from the user's own logged-in `bl` CLI.
     // Showcase polls (local models) must not trigger a login terminal: only a
     // session actually billed to Alibaba Cloud should auto-open the login.
-    const isShowcase = new URL(req.url ?? '/', 'http://internal').searchParams.get('showcase') === '1'
+    const isShowcase = params.get('showcase') === '1'
     json(res, 200, { ok: true, provider: kind, balance: await alibabaPlanFacts(isShowcase) })
     return
   }

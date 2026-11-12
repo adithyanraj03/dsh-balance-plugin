@@ -107,7 +107,7 @@ npm install -g bailian-cli
 bl auth login --console        # browser login; international accounts add --console-site international
 ```
 
-With `bl` installed and logged in, the chip shows percent used and the window reset countdown (`4.22% · resets in 1d 6h`); without it, the chip runs in night-discount-only mode and says where the credits live. Readings cache for five minutes. If the console session expires, the host opens a terminal running the login for you (the CLI opens the browser); set `DSH_BALANCE_NO_AUTOLOGIN=1` to disable that.
+With `bl` installed and logged in, the chip shows percent used and the window reset countdown (`4.22% · resets in 1d 6h`); without it, the chip runs in night-discount-only mode and says where the credits live. Readings cache for five minutes. If the console session expires, the percentage slot turns into a refresh‑% sign-in button — click the chip and the host opens a terminal running the login (the CLI opens the browser). Set `DSH_BALANCE_AUTOLOGIN=1` to also open it automatically on expiry.
 
 Live captures from a Model Studio session — the all-day launch promo, and the last hour before nights open on a DeepSeek-on-plan model:
 
@@ -123,7 +123,7 @@ All optional:
 |---|---|---|
 | `DSH_BALANCE_MOCK=1` or `?mock=1` | off | canned balances for every provider, no account needed |
 | `DSH_BALANCE_BL` | `bl` on PATH | path to the Model Studio CLI binary |
-| `DSH_BALANCE_NO_AUTOLOGIN=1` | off | stop auto-opening a login terminal when the Token Plan session expires |
+| `DSH_BALANCE_AUTOLOGIN=1` | off | also auto-open the login terminal when the Token Plan session expires (default: a sign-in button on the chip instead) |
 
 Provider keys resolve from `~/.dsh/.credentials.yaml` first, then the environment (`DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`, `MOONSHOT_API_KEY`, `ZAI_API_KEY`/`GLM_API_KEY`/`ZHIPU_API_KEY`, `MINIMAX_API_KEY`). Alibaba needs no key at all.
 
