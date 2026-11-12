@@ -141,13 +141,16 @@ const HOUR_MS_HOST = 3_600_000
 /** How long a `bl` quota reading stays fresh before the bridge re-runs it. */
 const BL_CACHE_MS = 5 * 60_000
 
+/** A failed/expired read re-checks sooner so a re-login shows up quickly. */
+const BL_NONE_CACHE_MS = 60_000
+
 /** The official Model Studio CLI, when the user installed it (`npm i -g @modelstudio/cli`). */
 const BL_COMMAND = process.env.DSH_BALANCE_BL ?? 'bl'
 
 const execFileAsync = promisify(execFile)
 
 /** One cached `bl usage token-plan` reading, shared by every chip poll. */
-let blCache: { at: number; facts: Record<string, unknown> } | undefined
+let blCache: { at: number; facts: Record<string, unknown>; ttl: number } | undefined
 
 /**
  * Read the Token Plan usage windows through the official `bl` CLI — the only
@@ -162,8 +165,9 @@ let blCache: { at: number; facts: Record<string, unknown> } | undefined
  */
 async function alibabaPlanFacts(): Promise<Record<string, unknown>> {
   const now = Date.now()
-  if (blCache !== undefined && now - blCache.at < BL_CACHE_MS) return blCache.facts
+  if (blCache !== undefined && now - blCache.at < blCache.ttl) return blCache.facts
   let facts: Record<string, unknown> = { plan: 'Token Plan', source: 'none' }
+  let ttl = BL_CACHE_MS
   try {
     // shell: true so Windows resolves bl.cmd; the argument list is fixed, so
     // nothing user-supplied reaches the shell string.
@@ -174,38 +178,59 @@ async function alibabaPlanFacts(): Promise<Record<string, unknown>> {
     })
     const parsed: unknown = JSON.parse(stdout)
     if (isRecord(parsed)) {
-      // The API reports per-window ratios (0..1) or percentages; normalize to
-      // percent-used and pick the shortest window, mirroring the CLI's order.
-      const windows: Array<{ hours: number; label: string; used?: number; reset?: number }> = []
-      for (const [field, value] of Object.entries(parsed)) {
-        const match = /^per(\d+)(Hour|Day|Week|Month)(Percentage|ResetTime)$/.exec(field)
-        if (match === null || typeof value !== 'number') continue
-        const hours = Number(match[1]) * ({ Hour: 1, Day: 24, Week: 168, Month: 720 } as Record<string, number>)[match[2]]
-        const label = `${match[1]}-${match[2].toLowerCase()}`
-        const window: { hours: number; label: string; used?: number; reset?: number } =
-          windows.find((entry) => entry.label === label) ?? { hours, label }
-        if (match[3] === 'Percentage') window.used = value <= 1 ? value * 100 : value
-        else window.reset = value
-        if (!windows.includes(window)) windows.push(window)
-      }
-      windows.sort((left, right) => left.hours - right.hours)
-      const primary = windows.find((window) => window.used !== undefined)
-      if (primary !== undefined) {
-        facts = {
-          plan: 'Token Plan',
-          source: 'bl',
-          usedPercent: Math.round((primary.used ?? 0) * 100) / 100,
-          windowLabel: primary.label,
-          resetAt: primary.reset,
-          windows: windows.map((window) => ({ label: window.label, usedPercent: window.used, resetAt: window.reset })),
+      if (isRecord(parsed.error)) {
+        // The CLI can report an auth problem on stdout with a zero exit.
+        facts.note = authNote(String(parsed.error.message ?? parsed.error.hint ?? ''))
+        ttl = BL_NONE_CACHE_MS
+      } else {
+        // The API reports per-window ratios (0..1) or percentages; normalize to
+        // percent-used and pick the shortest window, mirroring the CLI's order.
+        const windows: Array<{ hours: number; label: string; used?: number; reset?: number }> = []
+        for (const [field, value] of Object.entries(parsed)) {
+          const match = /^per(\d+)(Hour|Day|Week|Month)(Percentage|ResetTime)$/.exec(field)
+          if (match === null || typeof value !== 'number') continue
+          const hours = Number(match[1]) * ({ Hour: 1, Day: 24, Week: 168, Month: 720 } as Record<string, number>)[match[2]]
+          const label = `${match[1]}-${match[2].toLowerCase()}`
+          const window: { hours: number; label: string; used?: number; reset?: number } =
+            windows.find((entry) => entry.label === label) ?? { hours, label }
+          if (match[3] === 'Percentage') window.used = value <= 1 ? value * 100 : value
+          else window.reset = value
+          if (!windows.includes(window)) windows.push(window)
+        }
+        windows.sort((left, right) => left.hours - right.hours)
+        const primary = windows.find((window) => window.used !== undefined)
+        if (primary !== undefined) {
+          facts = {
+            plan: 'Token Plan',
+            source: 'bl',
+            usedPercent: Math.round((primary.used ?? 0) * 100) / 100,
+            windowLabel: primary.label,
+            resetAt: primary.reset,
+            windows: windows.map((window) => ({ label: window.label, usedPercent: window.used, resetAt: window.reset })),
+          }
         }
       }
     }
-  } catch {
-    // No CLI, no login, timeout, or malformed output: night-discount-only chip.
+  } catch (error) {
+    // No CLI, expired login, timeout, or malformed output: night-discount-only
+    // chip, with a note saying which so the popover is not misleading.
+    const e = error as { stdout?: string; stderr?: string; code?: string | number }
+    const raw = `${e.stdout ?? ''}${e.stderr ?? ''}`
+    facts.note = e.code === 'ENOENT' || /not recognized|not found/i.test(raw)
+      ? 'bl CLI not found — npm install -g bailian-cli'
+      : authNote(raw)
+    ttl = BL_NONE_CACHE_MS
   }
-  blCache = { at: now, facts }
+  blCache = { at: now, facts, ttl }
   return facts
+}
+
+/** Turn a bl error blob into a short, actionable popover note. */
+function authNote(raw: string): string {
+  if (/not logged in|expired|login|sign in/i.test(raw)) {
+    return 'bl console session expired — run: bl auth login --console'
+  }
+  return 'bl quota read failed — click the chip to retry'
 }
 
 /**

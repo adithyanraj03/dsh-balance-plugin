@@ -127,6 +127,7 @@ interface BalanceResponse {
     // when logged in; `source: 'none'` means night-discount-only mode).
     plan?: string
     source?: string
+    note?: string
     usedPercent?: number
     windowLabel?: string
     resetAt?: number
@@ -158,6 +159,8 @@ type DisplayState =
       discount?: number
       /** Alibaba only: whether the discount runs at night or all day. */
       discountScope?: 'night' | 'always'
+      /** Alibaba only: why no usage percentage is available (expired login, …). */
+      note?: string
       dotColor: CSSProperties['background']
     }
   | { kind: 'error'; message: string }
@@ -738,7 +741,7 @@ function renderAlibaba(data: BalanceResponse, model?: string): DisplayState {
     : ''
   const detail = used !== undefined
     ? `${used.toFixed(2)}% of ${info?.windowLabel ?? 'plan'} credits used${resetIn}`
-    : 'Credits live in the Model Studio console'
+    : (typeof info?.note === 'string' ? info.note : 'Credits live in the Model Studio console')
   return {
     kind: 'ok',
     provider: 'alibaba',
@@ -751,6 +754,7 @@ function renderAlibaba(data: BalanceResponse, model?: string): DisplayState {
     resetAt: info?.resetAt,
     discount: discount?.percent,
     discountScope: discount?.scope,
+    note: typeof info?.note === 'string' ? info.note : undefined,
     dotColor: used === undefined || used < 90
       ? 'var(--dsw-alias-state-success-primary)'
       : 'var(--dsw-alias-state-error-primary)',
@@ -1020,7 +1024,7 @@ export function tooltipLines(state: DisplayState, now: Date = new Date(), footer
         : ''
       lines.push({ text: `${state.usedPercent.toFixed(2)}% of ${state.windowLabel ?? 'plan'} credits used${reset}`, detail: true })
     } else {
-      lines.push({ text: 'Usage % appears once the bl CLI is installed and logged in', muted: true })
+      lines.push({ text: state.note ?? 'Usage % appears once the bl CLI is installed and logged in', muted: true })
     }
   } else {
     lines.push({ text: state.heading })

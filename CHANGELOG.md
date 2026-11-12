@@ -8,6 +8,16 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/@adithyanraj/dsh-balance-plugin)
 (the unscoped `dsh-balance-plugin` name belongs to an unrelated package).
 
+## [0.14.1] — 2026-11-12
+
+### Fixed
+
+- The Alibaba popover now says **why** there is no usage percentage instead of
+  the misleading "install and log in" line: an expired `bl` console session
+  shows `bl console session expired — run: bl auth login --console`, a missing
+  CLI shows the install command, and any other read failure offers a retry.
+  Failed reads re-check after 60 s (not 5 min) so a re-login shows up quickly.
+
 ## [0.14.0] — 2026-11-12
 
 ### Added
