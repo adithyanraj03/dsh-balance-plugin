@@ -48,7 +48,7 @@ function extractFunction(source, name) {
  * @returns the bundle's own `kindForProvider`.
  */
 function loadMapping(bundle) {
-  const parts = ['unwrapModlensProvider', 'kindForProvider']
+  const parts = ['unwrapModlensProvider', 'knownProviderKind', 'kindForProvider']
     .map((name) => extractFunction(bundle, name))
     .filter((part) => part !== undefined)
   return new Function(`${parts.join('\n')}\nreturn kindForProvider`)()

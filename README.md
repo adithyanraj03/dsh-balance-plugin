@@ -13,11 +13,12 @@ English | [中文](README.zh-CN.md)
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that puts the account balance of whichever provider is serving your current model into the composer dock — with the provider's brand mark, a status dot, and live countdowns for the billing windows that change what a token costs.
 
-It does four things:
+It does five things:
 
 - **A chip in the composer** naming the provider and its remaining balance (or plan quota), pinned to the right end of the dock. On a blank session it sits in the hero tool row and flies down to the dock when you send.
 - **Billing-window countdowns on the chip**: DeepSeek's peak/off-peak hours and Alibaba Cloud's Token Plan night discount, as tinted pills with a sweeping clock — teal while the cheap window runs, red in the last hour before it opens, waving in the final five minutes.
 - **A hover popover in your own local time**: the windows with AM/PM tags and your zone label, the countdown, and the provider's own breakdown (cash/granted, credits, prompts, or Token Plan percent used).
+- **A showcase for local models**: when the session's model has no billable provider (a local or custom model), the chip stops guessing and rotates through the providers it does support — Alibaba first, then the rest, ~10 s each. Each card also names that provider's next billing-window change, so an upcoming off-peak or night switch is visible while you rotate. Hovering pauses the rotation; clicking jumps to the next provider.
 - **Host-side secrets**: the browser never sees an API key. The host resolves it through the credentials seam and talks to the provider alone; Alibaba usage percentages come from your own logged-in `bl` CLI, never from a key this plugin stores.
 
 ## Install
@@ -93,6 +94,10 @@ Hovering and switching model, live: the popover and the pill follow the selectio
 
 The provider follows the session's model selection, including modlens vision wrappers and custom openai-compat channels aimed at Model Studio (Qwen model names identify those). Model Studio sessions wear the **Qwen knot** on the chip — the models being billed are Qwen-family, and the knot reads better at 14px than the Alibaba Cloud bracket.
 
+### The showcase (local models)
+
+A local or custom model has no billable provider, so instead of guessing one the chip runs a showcase: it rotates through the six supported providers, **Alibaba first**, ~10 s each, showing each one's real card. Providers without a key are skipped; Alibaba always answers, so the rotation never runs dry. Every card also names that provider's **next billing-window change** (`off-peak in 2h`, `nights start in 4h`), so an upcoming switch is visible while you rotate. Hovering pauses the rotation so you can read; clicking jumps straight to the next provider. Pin a real provider by naming the channel `alibaba-cloud`, `deepseek`, `openrouter`, etc.
+
 ### Alibaba usage percentages
 
 Model Studio's quota gateway accepts console-login or AccessKey-derived tokens only — never a model API key — so the chip reads your usage through the official CLI instead of storing any secret:
@@ -143,7 +148,7 @@ python scripts/make-banner.py   # regenerate the README banners (Pillow)
 
 **Alibaba shows `Token Plan` instead of a percentage.** The `bl` CLI is absent or not logged in; the night-discount pill still works. Install and log in as above, then click the chip.
 
-**A custom channel shows the wrong provider.** Known provider ids win; unknown ids fall back to DeepSeek unless the model name starts with `qwen`. Rename the channel to `alibaba-cloud` (or `dashscope`/`bailian`) to pin it.
+**A local model shows a rotating showcase instead of one balance.** That is intended: a local/custom model has no billable provider, so the chip cycles the supported providers (Alibaba first) rather than guessing. To pin a single provider, name the channel after it (`alibaba-cloud`, `deepseek`, `openrouter`, …).
 
 ## Licence
 

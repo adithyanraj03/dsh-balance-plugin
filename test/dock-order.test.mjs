@@ -248,6 +248,6 @@ test('the amount is rendered unconditionally, in every chip state', () => {
   // form, which hid the balance in the app's default window.
   assert.doesNotMatch(bundle, /compact|COMPACT|cramped|CRAMPED/)
   // Both amount spans are plain children: no `&&` guard in front of either.
-  assert.match(bundle, /jsxs\)\("span", \{\s*style: amountStyle,\s*children: \[state\.symbol, state\.total\]/)
+  assert.match(bundle, /jsxs\)\("span", \{\s*style: amountStyle,\s*children: \[view\.symbol, view\.total\]/)
   assert.match(bundle, /jsx\)\("span", \{\s*style: amountStyle,\s*children: "Balance —"/)
 })

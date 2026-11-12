@@ -8,6 +8,30 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/@adithyanraj/dsh-balance-plugin)
 (the unscoped `dsh-balance-plugin` name belongs to an unrelated package).
 
+## [0.14.0] — 2026-11-12
+
+### Added
+
+- **Provider showcase for local / custom models.** When the session's provider
+  is not one of the six the plugin can bill, the chip no longer guesses a
+  balance (the old fallback showed Alibaba for any Qwen-named local model).
+  It now rotates through the supported providers — Alibaba first, then
+  DeepSeek, OpenRouter, Moonshot, Zhipu, MiniMax — about every 10 s, showing
+  each one's real card. Providers without a key are skipped; Alibaba always
+  answers so the rotation never runs dry.
+- Each showcase card names that provider's **next billing-window change**
+  (`off-peak in 2h`, `nights start in 4h`), so an upcoming off-peak / night
+  switch is visible while rotating.
+- Hovering pauses the rotation; clicking the chip jumps to the next provider.
+  Naming a channel after a real provider (`alibaba-cloud`, `deepseek`, …)
+  pins it and disables the showcase.
+
+### Changed
+
+- Provider detection split into `knownProviderKind` (explicit ids only) and
+  `kindForProvider` (adds the Qwen-model hint for custom Model Studio
+  channels). The showcase triggers on `knownProviderKind === null`.
+
 ## [0.13.4] — 2026-11-11
 
 ### Fixed

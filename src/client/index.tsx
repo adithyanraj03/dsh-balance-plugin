@@ -186,20 +186,66 @@ function unwrapModlensProvider(provider: string): string {
  * pi-ai built-in catalog names; each regional (`-cn`) variant maps to the same
  * kind because the host tries the matching mirror endpoint for that key's site.
  */
-function kindForProvider(provider: string, model?: string): BalanceKind {
+function knownProviderKind(provider: string): BalanceKind | null {
   const p = unwrapModlensProvider(provider)
   if (p === 'openrouter') return 'openrouter'
   if (p === 'moonshotai' || p === 'moonshotai-cn') return 'moonshot'
   if (p === 'zai' || p === 'zai-coding-cn' || p === 'zhipu') return 'zhipu'
   if (p === 'minimax' || p === 'minimax-cn') return 'minimax'
   if (p === 'alibaba-cloud' || p === 'alibaba' || p === 'dashscope' || p === 'bailian' || p === 'qwen' || p === 'model-studio') return 'alibaba'
-  // A known provider id always wins over the model-name hint: DeepSeek sells
-  // Qwen-family names on its own platform too, and its balance is the point.
   if (p === 'deepseek') return 'deepseek'
+  return null
+}
+
+function kindForProvider(provider: string, model?: string): BalanceKind {
+  const known = knownProviderKind(provider)
+  if (known !== null) return known
   // Custom openai-compat channels aimed at Model Studio carry an arbitrary
   // provider id; Qwen models only exist there, so the model name identifies them.
   if (model !== undefined && model.toLowerCase().startsWith('qwen')) return 'alibaba'
   return 'deepseek'
+}
+
+/**
+ * The showcase rotation: when the session's provider is not one of the six the
+ * plugin can bill (a local or custom model), the chip cycles through the
+ * providers it does support instead of guessing one. Alibaba leads because it
+ * needs no key; the rest follow in catalog order.
+ */
+export const SHOWCASE_ORDER: readonly BalanceKind[] = ['alibaba', 'deepseek', 'openrouter', 'moonshot', 'zhipu', 'minimax']
+
+/** How long each provider's card stays on screen in the showcase. */
+export const SHOWCASE_INTERVAL_MS = 10_000
+
+/**
+ * The next billing-window change for a provider, as a short countdown line, or
+ * null for providers with no windows. This is what the showcase card surfaces
+ * so an upcoming off-peak / night switch is visible while rotating.
+ */
+export function nextChangeLabel(kind: BalanceKind, now: Date = new Date()): string | null {
+  if (kind === 'deepseek') {
+    const { at, to } = nextTransition(now)
+    return `${to === 'peak' ? 'peak' : 'off-peak'} in ${formatCountdown(at.getTime() - now.getTime())}`
+  }
+  if (kind === 'alibaba') {
+    const { at, to } = nextAlibabaTransition(now)
+    return `${to === 'night' ? 'nights start' : 'nights end'} in ${formatCountdown(at.getTime() - now.getTime())}`
+  }
+  return null
+}
+
+/**
+ * The next showcase slot after `current` whose provider has a usable card.
+ * Wraps around; if nothing is usable it stays put rather than spinning.
+ * @param available - per-slot usability, aligned with {@link SHOWCASE_ORDER}.
+ */
+export function nextShowcaseIndex(current: number, available: readonly boolean[]): number {
+  const n = available.length
+  for (let step = 1; step <= n; step += 1) {
+    const idx = (current + step) % n
+    if (available[idx]) return idx
+  }
+  return current
 }
 
 /**
@@ -285,6 +331,19 @@ function modelForSession(
   if (sessionId === undefined || modelDirectories === undefined) return undefined
   try {
     return modelDirectories.directoryFor(sessionId).store.getSnapshot().current?.model
+  } catch {
+    return undefined
+  }
+}
+
+/** The active session's provider id, or undefined when no directory is bound. */
+function providerForSession(
+  modelDirectories: ModelDirectoryServiceLike | undefined,
+  sessionId: SessionId | undefined,
+): string | undefined {
+  if (sessionId === undefined || modelDirectories === undefined) return undefined
+  try {
+    return modelDirectories.directoryFor(sessionId).store.getSnapshot().current?.provider
   } catch {
     return undefined
   }
@@ -893,7 +952,7 @@ function prefersReducedMotion(): boolean {
  * @param now - the hover instant (defaults to now).
  * @returns the tooltip's lines, heading first.
  */
-export function tooltipLines(state: DisplayState, now: Date = new Date()): TooltipLine[] {
+export function tooltipLines(state: DisplayState, now: Date = new Date(), footer = 'Click to refresh'): TooltipLine[] {
   if (state.kind === 'loading') return [{ text: 'Loading balance…' }]
   if (state.kind === 'error') {
     return [
@@ -969,7 +1028,7 @@ export function tooltipLines(state: DisplayState, now: Date = new Date()): Toolt
   // Alibaba's usage line already carries the breakdown; repeating state.detail
   // would print the same sentence twice.
   if (state.provider !== 'alibaba') lines.push({ text: state.detail, detail: true })
-  lines.push({ text: 'Click to refresh', muted: true })
+  lines.push({ text: footer, muted: true })
   return lines
 }
 
@@ -1226,8 +1285,9 @@ function ClockGlyph() {
  * the popover must stay inside.
  * @returns the tooltip element.
  */
-function ChipTooltip({ state, rect, bounds }: { readonly state: DisplayState; readonly rect: DOMRect; readonly bounds: { left: number; right: number } }) {
-  const lines = tooltipLines(state)
+function ChipTooltip({ state, rect, bounds, extra, footer }: { readonly state: DisplayState; readonly rect: DOMRect; readonly bounds: { left: number; right: number }; readonly extra?: readonly TooltipLine[]; readonly footer?: string }) {
+  const lines = tooltipLines(state, new Date(), footer)
+  if (extra !== undefined && extra.length > 0) lines.splice(lines.length - 1, 0, ...extra)
   // Center the panel on the chip — the icon is the pivot — then shift it the
   // minimum distance to stay inside the lane between the bars, so it only
   // moves when a panel, rail, or the window edge would otherwise occlude it.
@@ -1402,6 +1462,14 @@ export function BalanceChip({
     (snapshot) => sessionIsBlank(snapshot as unknown as SessionsSnapshotLike),
   )
 
+  // A local / custom model has no billable provider: instead of guessing one
+  // (the old fallback showed Alibaba for any Qwen-named local model), the chip
+  // runs a showcase that rotates through the providers it does support.
+  const sessionProvider = providerForSession(getModelDirectories(), activeSession)
+  const showcase = sessionProvider !== undefined && knownProviderKind(sessionProvider) === null
+  const [showCards, setShowCards] = useState<Partial<Record<BalanceKind, DisplayState>>>({})
+  const [showIdx, setShowIdx] = useState(0)
+
   const refresh = useCallback(async () => {
     setState({ kind: 'loading' })
     try {
@@ -1416,16 +1484,52 @@ export function BalanceChip({
     }
   }, [getModelDirectories, activeSession])
 
+  // Showcase: fetch every supported provider once (and on the normal poll
+  // cadence) so the rotation has cards to show. Providers without a key return
+  // an error card and are skipped by the rotation; Alibaba always answers.
+  const loadShowcase = useCallback(async () => {
+    const entries = await Promise.all(SHOWCASE_ORDER.map(async (kind): Promise<[BalanceKind, DisplayState]> => {
+      try {
+        const res = await fetch(`${BALANCE_ENDPOINT}?kind=${kind}`, { headers: { accept: 'application/json' } })
+        const data = (await res.json()) as BalanceResponse
+        return [kind, data.ok ? displayState(data) : { kind: 'error', message: data.message ?? data.error ?? 'unavailable' }]
+      } catch {
+        return [kind, { kind: 'error', message: 'Failed to load' }]
+      }
+    }))
+    setShowCards(Object.fromEntries(entries) as Partial<Record<BalanceKind, DisplayState>>)
+  }, [])
+
+  useEffect(() => {
+    if (!showcase) return
+    if (variant === 'hero' && !blank) return
+    void loadShowcase()
+    const timer = window.setInterval(() => { void loadShowcase() }, REFRESH_INTERVAL_MS)
+    return () => { window.clearInterval(timer) }
+  }, [showcase, loadShowcase, variant, blank])
+
+  // Advance the rotation every SHOWCASE_INTERVAL_MS, but pause while the panel
+  // is open so reading a card is never interrupted mid-sentence.
+  useEffect(() => {
+    if (!showcase) return
+    const timer = window.setInterval(() => {
+      if (tipOpenRef.current) return
+      setShowIdx((i) => nextShowcaseIndex(i, SHOWCASE_ORDER.map((k) => showCards[k]?.kind === 'ok')))
+    }, SHOWCASE_INTERVAL_MS)
+    return () => { window.clearInterval(timer) }
+  }, [showcase, showCards])
+
   // Poll while visible. The hero instance stays mounted (rendering nothing)
   // once the session gets its first message, and an idle instance has no
   // reason to keep spending requests — the dock instance takes the polling
   // over in the same commit.
   useEffect(() => {
     if (variant === 'hero' && !blank) return
+    if (showcase) return // the showcase owns fetching in this mode
     void refresh()
     const timer = window.setInterval(() => { void refresh() }, REFRESH_INTERVAL_MS)
     return () => { window.clearInterval(timer) }
-  }, [refresh, variant, blank])
+  }, [refresh, variant, blank, showcase])
 
   // Subscribe to the active session's model-directory store so the chip
   // re-polls as soon as the directory resolves and whenever flipping the model
@@ -1446,12 +1550,13 @@ export function BalanceChip({
       const provider = directory.store.getSnapshot().current?.provider
       if (provider !== lastProvider) {
         lastProvider = provider
-        void refresh()
+        if (showcase) void loadShowcase()
+        else void refresh()
       }
     }
     const unsubscribe = directory.store.subscribe(onModelChange)
     return () => { unsubscribe() }
-  }, [getModelDirectories, activeSession, refresh, variant, blank])
+  }, [getModelDirectories, activeSession, refresh, variant, blank, showcase, loadShowcase])
 
   // Pin the chip to the dock's right end, after the context meter. The pin
   // writes `order` on the slot outlet (the dock row's real flex child) and on
@@ -1666,20 +1771,45 @@ export function BalanceChip({
   // seat hides and shows again.
   if (variant === 'hero' && !blank) return null
 
+  // In showcase mode the chip shows the rotated provider's card; otherwise the
+  // session provider's own balance.
+  const view: DisplayState = showcase
+    ? (showCards[SHOWCASE_ORDER[showIdx]] ?? { kind: 'loading' })
+    : state
+  const showcaseAvailable = SHOWCASE_ORDER.map((k) => showCards[k]?.kind === 'ok')
+  const advanceShowcase = (): void => {
+    setShowIdx((i) => nextShowcaseIndex(i, showcaseAvailable))
+  }
+  const onChipClick = (): void => {
+    if (showcase) {
+      advanceShowcase()
+      void loadShowcase()
+    } else {
+      void refresh()
+    }
+  }
+  const changeLabel = view.kind === 'ok' ? nextChangeLabel(view.provider) : null
+  const showcaseExtra: TooltipLine[] | undefined = showcase
+    ? [
+        ...(changeLabel !== null ? [{ text: `Next change: ${changeLabel}`, muted: true }] : []),
+        { text: 'Showcase · local model · click for the next provider', muted: true },
+      ]
+    : undefined
+
   // The DeepSeek billing countdown, evaluated on every render (the 60s poll
   // repaints it). Undefined for every other provider and quiet off-peak.
   // Alibaba carries its own night-discount pill on the same seat.
-  const timer = state.kind === 'ok'
-    ? state.provider === 'deepseek'
+  const timer = view.kind === 'ok'
+    ? view.provider === 'deepseek'
       ? chipTimer()
-      : state.provider === 'alibaba'
-        ? alibabaChipTimer(new Date(), state.discount, state.discountScope)
+      : view.provider === 'alibaba'
+        ? alibabaChipTimer(new Date(), view.discount, view.discountScope)
         : undefined
     : undefined
 
   return (
     <div ref={anchorRef}>
-      {state.kind === 'loading' ? (
+      {view.kind === 'loading' ? (
         <div
           style={chipStyle}
           aria-busy="true"
@@ -1690,15 +1820,15 @@ export function BalanceChip({
         >
           <span style={amountStyle}>Loading…</span>
         </div>
-      ) : state.kind === 'error' ? (
+      ) : view.kind === 'error' ? (
         <button
           type="button"
           style={chipStyle}
-          aria-label={`Balance unavailable — ${state.message}`}
+          aria-label={`Balance unavailable — ${view.message}`}
           onMouseLeave={dismissTip}
           onFocus={focusTip}
           onBlur={dismissTip}
-          onClick={() => { void refresh() }}
+          onClick={onChipClick}
         >
           <span style={amountStyle}>Balance —</span>
         </button>
@@ -1706,17 +1836,17 @@ export function BalanceChip({
         <button
           type="button"
           style={chipStyle}
-          aria-label={`${state.heading} ${state.symbol}${state.total}`}
+          aria-label={`${view.heading} ${view.symbol}${view.total}`}
           onMouseLeave={dismissTip}
           onFocus={focusTip}
           onBlur={dismissTip}
-          onClick={() => { void refresh() }}
+          onClick={onChipClick}
         >
-          <ProviderLogo provider={state.provider} />
+          <ProviderLogo provider={view.provider} />
           {/* The amount is the point of the chip, so it is never dropped for the
               account label's sake. */}
-          <span style={amountStyle}>{state.symbol}{state.total}</span>
-          <span role="img" aria-label={state.detail} style={{ ...dotBaseStyle, background: state.dotColor }} />
+          <span style={amountStyle}>{view.symbol}{view.total}</span>
+          <span role="img" aria-label={view.detail} style={{ ...dotBaseStyle, background: view.dotColor }} />
           {/* DeepSeek carries its billing countdown right on the strip, next to
               the dot: a tinted pill with a clock whose hand sweeps and pops —
               teal while the peak drains, red while it approaches, waving
@@ -1729,7 +1859,15 @@ export function BalanceChip({
           )}
         </button>
       )}
-      {tip !== null && <ChipTooltip state={state} rect={tip.rect} bounds={tip.bounds} />}
+      {tip !== null && (
+        <ChipTooltip
+          state={view}
+          rect={tip.rect}
+          bounds={tip.bounds}
+          extra={showcaseExtra}
+          footer={showcase ? 'Click for the next provider' : undefined}
+        />
+      )}
     </div>
   )
 }
