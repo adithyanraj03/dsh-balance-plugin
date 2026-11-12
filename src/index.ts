@@ -163,7 +163,7 @@ let blCache: { at: number; facts: Record<string, unknown>; ttl: number } | undef
  * the 60s chip poll does not spawn a process every tick.
  * @returns the plan facts for the client renderer.
  */
-async function alibabaPlanFacts(): Promise<Record<string, unknown>> {
+async function alibabaPlanFacts(skipAutoLogin = false): Promise<Record<string, unknown>> {
   const now = Date.now()
   if (blCache !== undefined && now - blCache.at < blCache.ttl) return blCache.facts
   let facts: Record<string, unknown> = { plan: 'Token Plan', source: 'none' }
@@ -221,7 +221,7 @@ async function alibabaPlanFacts(): Promise<Record<string, unknown>> {
       : authNote(raw)
     ttl = BL_NONE_CACHE_MS
   }
-  maybeAutoLogin(facts.note)
+  maybeAutoLogin(skipAutoLogin ? undefined : facts.note)
   blCache = { at: now, facts, ttl }
   return facts
 }
@@ -364,7 +364,10 @@ async function handleBalance(ctx: Context, req: IncomingMessage, res: ServerResp
     // No credential and no upstream call: the night-discount window is public
     // pricing knowledge the client computes itself, and the optional usage
     // percentage comes from the user's own logged-in `bl` CLI.
-    json(res, 200, { ok: true, provider: kind, balance: await alibabaPlanFacts() })
+    // Showcase polls (local models) must not trigger a login terminal: only a
+    // session actually billed to Alibaba Cloud should auto-open the login.
+    const isShowcase = new URL(req.url ?? '/', 'http://internal').searchParams.get('showcase') === '1'
+    json(res, 200, { ok: true, provider: kind, balance: await alibabaPlanFacts(isShowcase) })
     return
   }
   const apiKey = await resolveApiKey(ctx, spec)

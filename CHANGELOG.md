@@ -8,6 +8,16 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/@adithyanraj/dsh-balance-plugin)
 (the unscoped `dsh-balance-plugin` name belongs to an unrelated package).
 
+## [0.15.1] — 2026-11-12
+
+### Fixed
+
+- The automatic login terminal now fires **only for sessions actually billed
+  to Alibaba Cloud**. Showcase polls (local / custom models) are tagged
+  `showcase=1` and the host skips auto-login for them, so a local-model user
+  who merely has `bl` installed never gets a login window. A missing CLI still
+  never triggers it.
+
 ## [0.15.0] — 2026-11-12
 
 ### Added

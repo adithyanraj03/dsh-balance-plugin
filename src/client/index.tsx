@@ -1494,7 +1494,7 @@ export function BalanceChip({
   const loadShowcase = useCallback(async () => {
     const entries = await Promise.all(SHOWCASE_ORDER.map(async (kind): Promise<[BalanceKind, DisplayState]> => {
       try {
-        const res = await fetch(`${BALANCE_ENDPOINT}?kind=${kind}`, { headers: { accept: 'application/json' } })
+        const res = await fetch(`${BALANCE_ENDPOINT}?kind=${kind}&showcase=1`, { headers: { accept: 'application/json' } })
         const data = (await res.json()) as BalanceResponse
         return [kind, data.ok ? displayState(data) : { kind: 'error', message: data.message ?? data.error ?? 'unavailable' }]
       } catch {

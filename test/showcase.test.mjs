@@ -97,3 +97,9 @@ test('the rotation skips unusable providers, wraps, and never spins', () => {
   assert.equal(nextShowcaseIndex(0, [false, false, false, false, false, false]), 0, 'stays put when nothing is usable')
   assert.equal(nextShowcaseIndex(3, [true, true, true, true, true, true]), 4)
 })
+
+test('showcase polls are tagged so they never trigger the login terminal', () => {
+  // The showcase fetch carries showcase=1; the normal session fetch does not.
+  assert.match(bundle, /kind=\$\{kind\}&showcase=1/)
+  assert.match(bundle, /kind=\$\{kind\}`, \{ headers/)
+})
