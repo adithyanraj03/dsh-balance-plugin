@@ -8,6 +8,17 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/@adithyanraj/dsh-balance-plugin)
 (the unscoped `dsh-balance-plugin` name belongs to an unrelated package).
 
+## [0.15.0] — 2026-11-12
+
+### Added
+
+- **Automatic login terminal on session expiry.** When the Token Plan console
+  session lapses, the host opens a visible terminal running
+  `bl auth login --console --console-site international` so you can finish the
+  browser flow without hunting for a shell; the CLI opens the browser itself
+  and the window stays open afterwards. A 10-minute cooldown prevents a window
+  per poll, and `DSH_BALANCE_NO_AUTOLOGIN=1` opts out. Windows only.
+
 ## [0.14.1] — 2026-11-12
 
 ### Fixed

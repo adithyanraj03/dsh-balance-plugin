@@ -26,7 +26,7 @@
  * the chip can be previewed without an account on that platform.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
 // Type-only: pulls the webServer / credentials Context merges into this program.
@@ -221,6 +221,7 @@ async function alibabaPlanFacts(): Promise<Record<string, unknown>> {
       : authNote(raw)
     ttl = BL_NONE_CACHE_MS
   }
+  maybeAutoLogin(facts.note)
   blCache = { at: now, facts, ttl }
   return facts
 }
@@ -231,6 +232,40 @@ function authNote(raw: string): string {
     return 'bl console session expired — run: bl auth login --console'
   }
   return 'bl quota read failed — click the chip to retry'
+}
+
+/** How long between automatic login-terminal launches, so polls don't spam. */
+const AUTO_LOGIN_COOLDOWN_MS = 10 * 60_000
+
+/**
+ * Whether an expired-session note should trigger an automatic login terminal.
+ * Pure so it can be tested: only the expired-session note qualifies, the
+ * opt-out env disables it, and a cooldown bounds repeated launches.
+ */
+export function shouldAutoLogin(note: unknown, now: number, lastSpawn: number, disabled: boolean): boolean {
+  if (disabled) return false
+  if (typeof note !== 'string' || !note.startsWith('bl console session expired')) return false
+  return now - lastSpawn >= AUTO_LOGIN_COOLDOWN_MS
+}
+
+let lastAutoLogin = 0
+
+/**
+ * Open a visible terminal that runs the bl console login, so the user can
+ * finish the browser flow without hunting for a shell. The CLI opens the
+ * browser itself; `/k` keeps the window open afterwards. Windows only; a
+ * no-op elsewhere. Opt out with DSH_BALANCE_NO_AUTOLOGIN=1.
+ */
+function maybeAutoLogin(note: unknown): void {
+  const now = Date.now()
+  if (!shouldAutoLogin(note, now, lastAutoLogin, process.env.DSH_BALANCE_NO_AUTOLOGIN === '1')) return
+  if (process.platform !== 'win32') return
+  lastAutoLogin = now
+  const child = spawn('cmd.exe', [
+    '/c', 'start', '"DSH balance - bl login"', 'cmd.exe', '/k',
+    'bl auth login --console --console-site international',
+  ], { detached: true, stdio: 'ignore', windowsHide: false })
+  child.unref()
 }
 
 /**
