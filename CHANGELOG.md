@@ -8,6 +8,22 @@ Every release is also published on [GitHub Releases](https://github.com/adithyan
 and on npm as [`@adithyanraj/dsh-balance-plugin`](https://www.npmjs.com/package/@adithyanraj/dsh-balance-plugin)
 (the unscoped `dsh-balance-plugin` name belongs to an unrelated package).
 
+## [0.15.2] — 2026-11-12
+
+### Fixed
+
+- The auto-login terminal no longer fails with "Windows cannot find
+  'balance'". The `start "title" …` form was mis-quoted by argument joining;
+  the host now spawns a detached `cmd.exe /k …` directly, which allocates its
+  own visible console with no title argument to mis-parse.
+
+### Changed
+
+- The auto-login terminal is transparent: it titles itself
+  "DSH balance - bl login", echoes `Running: bl auth login --console
+  --console-site international` before executing it, and stays open afterwards
+  so the user can see exactly what ran and its result.
+
 ## [0.15.1] — 2026-11-12
 
 ### Fixed

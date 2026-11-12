@@ -261,9 +261,14 @@ function maybeAutoLogin(note: unknown): void {
   if (!shouldAutoLogin(note, now, lastAutoLogin, process.env.DSH_BALANCE_NO_AUTOLOGIN === '1')) return
   if (process.platform !== 'win32') return
   lastAutoLogin = now
+  // A detached cmd.exe with no inherited stdio allocates its own visible
+  // console; /k keeps it open after the login finishes. No `start` and no
+  // title argument to `start`, so there is no quoting for Windows to
+  // mis-parse. The session titles itself and echoes the exact command before
+  // running it, so the user can see what launched and why.
+  const login = 'bl auth login --console --console-site international'
   const child = spawn('cmd.exe', [
-    '/c', 'start', '"DSH balance - bl login"', 'cmd.exe', '/k',
-    'bl auth login --console --console-site international',
+    '/k', `title DSH balance - bl login & echo Running: ${login} & ${login}`,
   ], { detached: true, stdio: 'ignore', windowsHide: false })
   child.unref()
 }
