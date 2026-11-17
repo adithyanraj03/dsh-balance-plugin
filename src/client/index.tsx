@@ -198,6 +198,11 @@ function knownProviderKind(provider: string): BalanceKind | null {
   if (p === 'zai' || p === 'zai-coding-cn' || p === 'zhipu') return 'zhipu'
   if (p === 'minimax' || p === 'minimax-cn') return 'minimax'
   if (p === 'alibaba-cloud' || p === 'alibaba' || p === 'dashscope' || p === 'bailian' || p === 'qwen' || p === 'model-studio') return 'alibaba'
+  // Custom channels aimed at Model Studio carry ids like `qwen-token-plan-cn` (DSH's
+  // own Token Plan provider id) or `bailian-*`; match them by prefix so a Token Plan
+  // serving a non-Qwen model name is still read through the console quota gateway instead
+  // of falling through to the DeepSeek balance.
+  if (/^(qwen|bailian|dashscope|alibaba|model-studio)/i.test(p)) return 'alibaba'
   if (p === 'deepseek') return 'deepseek'
   return null
 }
