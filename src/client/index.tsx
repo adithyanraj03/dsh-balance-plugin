@@ -198,6 +198,10 @@ function knownProviderKind(provider: string): BalanceKind | null {
   if (p === 'zai' || p === 'zai-coding-cn' || p === 'zhipu') return 'zhipu'
   if (p === 'minimax' || p === 'minimax-cn') return 'minimax'
   if (p === 'alibaba-cloud' || p === 'alibaba' || p === 'dashscope' || p === 'bailian' || p === 'qwen' || p === 'model-studio') return 'alibaba'
+  // Custom Alibaba Model Studio (Token Plan) routes carry an arbitrary
+  // provider id such as `qwen-token-plan-cn`, and they usually serve
+  // DeepSeek models, so the model-name fallback below never matches them.
+  if (p.startsWith('qwen-token-plan') || p.startsWith('token-plan')) return 'alibaba'
   if (p === 'deepseek') return 'deepseek'
   return null
 }
